@@ -51,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<ICommonAreaService, CommonAreaService>();
         services.AddScoped<IReservationService, ReservationService>();
         services.AddScoped<IReceptionItemService, ReceptionItemService>();
+        services.AddScoped<IReportService, ReportService>();
 
         return services;
     }
