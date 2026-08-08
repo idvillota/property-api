@@ -44,6 +44,13 @@ public static class DependencyInjection
         services.AddScoped<IUnitService, UnitService>();
         services.AddScoped<IPersonService, PersonService>();
         services.AddScoped<IUnitOccupancyService, UnitOccupancyService>();
+        services.AddScoped<IFeeSettingsService, FeeSettingsService>();
+        services.AddScoped<IBillingPeriodService, BillingPeriodService>();
+        services.AddScoped<IFeeChargeService, FeeChargeService>();
+        services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<ICommonAreaService, CommonAreaService>();
+        services.AddScoped<IReservationService, ReservationService>();
+        services.AddScoped<IReceptionItemService, ReceptionItemService>();
 
         return services;
     }

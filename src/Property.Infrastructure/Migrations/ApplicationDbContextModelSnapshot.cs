@@ -22,6 +22,47 @@ namespace Property.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Property.Domain.Entities.BillingPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("HorizontalPropertyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HorizontalPropertyId");
+
+                    b.HasIndex("TenantId", "HorizontalPropertyId", "Year", "Month")
+                        .IsUnique();
+
+                    b.ToTable("BillingPeriods");
+                });
+
             modelBuilder.Entity("Property.Domain.Entities.Building", b =>
                 {
                     b.Property<Guid>("Id")
@@ -63,6 +104,67 @@ namespace Property.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Buildings");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.CommonArea", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AreaType")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("DepositAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("HorizontalPropertyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("MaxDurationMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MinDurationMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("RequiresDeposit")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("RulesNotes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HorizontalPropertyId");
+
+                    b.HasIndex("TenantId", "HorizontalPropertyId", "AreaType");
+
+                    b.HasIndex("TenantId", "HorizontalPropertyId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("CommonAreas");
                 });
 
             modelBuilder.Entity("Property.Domain.Entities.Employee", b =>
@@ -140,6 +242,102 @@ namespace Property.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Features");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.FeeCharge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("AmountPaid")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("BillingPeriodId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ChargeType")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("CoefficientSnapshot")
+                        .HasPrecision(18, 5)
+                        .HasColumnType("numeric(18,5)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("HorizontalPropertyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BillingPeriodId");
+
+                    b.HasIndex("HorizontalPropertyId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("TenantId", "UnitId", "Status");
+
+                    b.HasIndex("TenantId", "HorizontalPropertyId", "BillingPeriodId", "UnitId", "ChargeType");
+
+                    b.ToTable("FeeCharges");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.FeeSettings", b =>
+                {
+                    b.Property<Guid>("HorizontalPropertyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("DueDayOfMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("LateInterestMonthlyPercent")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("MonthlyBudgetAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("HorizontalPropertyId");
+
+                    b.ToTable("FeeSettings");
                 });
 
             modelBuilder.Entity("Property.Domain.Entities.Floor", b =>
@@ -296,6 +494,101 @@ namespace Property.Infrastructure.Migrations
                     b.ToTable("Neighborhoods");
                 });
 
+            modelBuilder.Entity("Property.Domain.Entities.Payment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("HorizontalPropertyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HorizontalPropertyId");
+
+                    b.HasIndex("PersonId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("TenantId", "HorizontalPropertyId", "UnitId");
+
+                    b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.PaymentAllocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FeeChargeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FeeChargeId");
+
+                    b.HasIndex("PaymentId");
+
+                    b.HasIndex("TenantId", "PaymentId", "FeeChargeId")
+                        .IsUnique();
+
+                    b.ToTable("PaymentAllocations");
+                });
+
             modelBuilder.Entity("Property.Domain.Entities.Person", b =>
                 {
                     b.Property<Guid>("Id")
@@ -346,6 +639,150 @@ namespace Property.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("People");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.ReceptionItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CarrierOrSender")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeliveredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeliveredByEmployeeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("HorizontalPropertyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ItemType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid?>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReceivedByEmployeeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RecipientName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TrackingOrReference")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeliveredByEmployeeId");
+
+                    b.HasIndex("HorizontalPropertyId");
+
+                    b.HasIndex("PersonId");
+
+                    b.HasIndex("ReceivedByEmployeeId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("TenantId", "HorizontalPropertyId", "Status");
+
+                    b.HasIndex("TenantId", "UnitId", "Status");
+
+                    b.ToTable("ReceptionItems");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.Reservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttendeesCount")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CommonAreaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("DepositPaid")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("EndsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("HorizontalPropertyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid?>("PersonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("StartsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HorizontalPropertyId");
+
+                    b.HasIndex("PersonId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("CommonAreaId", "StartsAtUtc");
+
+                    b.HasIndex("TenantId", "HorizontalPropertyId", "Status");
+
+                    b.ToTable("Reservations");
                 });
 
             modelBuilder.Entity("Property.Domain.Entities.Role", b =>
@@ -745,10 +1182,32 @@ namespace Property.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("Property.Domain.Entities.BillingPeriod", b =>
+                {
+                    b.HasOne("Property.Domain.Entities.HorizontalProperty", "HorizontalProperty")
+                        .WithMany()
+                        .HasForeignKey("HorizontalPropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("HorizontalProperty");
+                });
+
             modelBuilder.Entity("Property.Domain.Entities.Building", b =>
                 {
                     b.HasOne("Property.Domain.Entities.HorizontalProperty", "HorizontalProperty")
                         .WithMany("Buildings")
+                        .HasForeignKey("HorizontalPropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("HorizontalProperty");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.CommonArea", b =>
+                {
+                    b.HasOne("Property.Domain.Entities.HorizontalProperty", "HorizontalProperty")
+                        .WithMany("CommonAreas")
                         .HasForeignKey("HorizontalPropertyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -763,6 +1222,44 @@ namespace Property.Infrastructure.Migrations
                         .HasForeignKey("Property.Domain.Entities.Employee", "TenantUserId");
 
                     b.Navigation("TenantUser");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.FeeCharge", b =>
+                {
+                    b.HasOne("Property.Domain.Entities.BillingPeriod", "BillingPeriod")
+                        .WithMany("FeeCharges")
+                        .HasForeignKey("BillingPeriodId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Property.Domain.Entities.HorizontalProperty", "HorizontalProperty")
+                        .WithMany()
+                        .HasForeignKey("HorizontalPropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Property.Domain.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("BillingPeriod");
+
+                    b.Navigation("HorizontalProperty");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.FeeSettings", b =>
+                {
+                    b.HasOne("Property.Domain.Entities.HorizontalProperty", "HorizontalProperty")
+                        .WithOne()
+                        .HasForeignKey("Property.Domain.Entities.FeeSettings", "HorizontalPropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("HorizontalProperty");
                 });
 
             modelBuilder.Entity("Property.Domain.Entities.Floor", b =>
@@ -784,6 +1281,124 @@ namespace Property.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Neighborhood");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.Payment", b =>
+                {
+                    b.HasOne("Property.Domain.Entities.HorizontalProperty", "HorizontalProperty")
+                        .WithMany()
+                        .HasForeignKey("HorizontalPropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Property.Domain.Entities.Person", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Property.Domain.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("HorizontalProperty");
+
+                    b.Navigation("Person");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.PaymentAllocation", b =>
+                {
+                    b.HasOne("Property.Domain.Entities.FeeCharge", "FeeCharge")
+                        .WithMany("Allocations")
+                        .HasForeignKey("FeeChargeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Property.Domain.Entities.Payment", "Payment")
+                        .WithMany("Allocations")
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FeeCharge");
+
+                    b.Navigation("Payment");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.ReceptionItem", b =>
+                {
+                    b.HasOne("Property.Domain.Entities.Employee", "DeliveredByEmployee")
+                        .WithMany()
+                        .HasForeignKey("DeliveredByEmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Property.Domain.Entities.HorizontalProperty", "HorizontalProperty")
+                        .WithMany()
+                        .HasForeignKey("HorizontalPropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Property.Domain.Entities.Person", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Property.Domain.Entities.Employee", "ReceivedByEmployee")
+                        .WithMany()
+                        .HasForeignKey("ReceivedByEmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Property.Domain.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("DeliveredByEmployee");
+
+                    b.Navigation("HorizontalProperty");
+
+                    b.Navigation("Person");
+
+                    b.Navigation("ReceivedByEmployee");
+
+                    b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.Reservation", b =>
+                {
+                    b.HasOne("Property.Domain.Entities.CommonArea", "CommonArea")
+                        .WithMany("Reservations")
+                        .HasForeignKey("CommonAreaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Property.Domain.Entities.HorizontalProperty", "HorizontalProperty")
+                        .WithMany()
+                        .HasForeignKey("HorizontalPropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Property.Domain.Entities.Person", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Property.Domain.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CommonArea");
+
+                    b.Navigation("HorizontalProperty");
+
+                    b.Navigation("Person");
+
+                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("Property.Domain.Entities.Role", b =>
@@ -916,9 +1531,19 @@ namespace Property.Infrastructure.Migrations
                     b.Navigation("Unit");
                 });
 
+            modelBuilder.Entity("Property.Domain.Entities.BillingPeriod", b =>
+                {
+                    b.Navigation("FeeCharges");
+                });
+
             modelBuilder.Entity("Property.Domain.Entities.Building", b =>
                 {
                     b.Navigation("Floors");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.CommonArea", b =>
+                {
+                    b.Navigation("Reservations");
                 });
 
             modelBuilder.Entity("Property.Domain.Entities.Feature", b =>
@@ -926,11 +1551,23 @@ namespace Property.Infrastructure.Migrations
                     b.Navigation("RoleFeatures");
                 });
 
+            modelBuilder.Entity("Property.Domain.Entities.FeeCharge", b =>
+                {
+                    b.Navigation("Allocations");
+                });
+
             modelBuilder.Entity("Property.Domain.Entities.HorizontalProperty", b =>
                 {
                     b.Navigation("Buildings");
 
+                    b.Navigation("CommonAreas");
+
                     b.Navigation("Units");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.Payment", b =>
+                {
+                    b.Navigation("Allocations");
                 });
 
             modelBuilder.Entity("Property.Domain.Entities.Role", b =>

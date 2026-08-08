@@ -14,6 +14,12 @@ public static class FeatureCodes
     public const string StructureFloors = "structure.floors";
     public const string StructureUnits = "structure.units";
     public const string PeopleManage = "people.manage";
+    public const string BillingSettings = "billing.settings";
+    public const string BillingCharges = "billing.charges";
+    public const string BillingPayments = "billing.payments";
+    public const string AmenitiesAreas = "amenities.areas";
+    public const string AmenitiesReservations = "amenities.reservations";
+    public const string ReceptionManage = "reception.manage";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -29,5 +35,11 @@ public static class FeatureCodes
         StructureFloors,
         StructureUnits,
         PeopleManage,
+        BillingSettings,
+        BillingCharges,
+        BillingPayments,
+        AmenitiesAreas,
+        AmenitiesReservations,
+        ReceptionManage,
     ];
 }

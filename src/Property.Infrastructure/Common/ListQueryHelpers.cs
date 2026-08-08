@@ -71,4 +71,17 @@ internal static class ListQueryHelpers
 
     public static bool TryParseInt(string? value, out int result) =>
         int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result);
+
+    public static bool TryParseDateTimeUtc(string? value, out DateTime result)
+    {
+        if (DateTime.TryParse(
+                value,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out result))
+            return true;
+
+        result = default;
+        return false;
+    }
 }

@@ -19,4 +19,5 @@ public class HorizontalProperty : NamedTenantEntity
     public Neighborhood? Neighborhood { get; set; }
     public ICollection<Building> Buildings { get; set; } = new List<Building>();
     public ICollection<Unit> Units { get; set; } = new List<Unit>();
+    public ICollection<CommonArea> CommonAreas { get; set; } = new List<CommonArea>();
 }

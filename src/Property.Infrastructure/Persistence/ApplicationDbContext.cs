@@ -31,6 +31,14 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<Unit> Units => Set<Unit>();
     public DbSet<Person> People => Set<Person>();
     public DbSet<UnitOccupancy> UnitOccupancies => Set<UnitOccupancy>();
+    public DbSet<FeeSettings> FeeSettings => Set<FeeSettings>();
+    public DbSet<BillingPeriod> BillingPeriods => Set<BillingPeriod>();
+    public DbSet<FeeCharge> FeeCharges => Set<FeeCharge>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
+    public DbSet<CommonArea> CommonAreas => Set<CommonArea>();
+    public DbSet<Reservation> Reservations => Set<Reservation>();
+    public DbSet<ReceptionItem> ReceptionItems => Set<ReceptionItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -206,6 +214,150 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.TenantId, x.UnitId, x.PersonId, x.StartDate });
         });
 
+        modelBuilder.Entity<FeeSettings>(e =>
+        {
+            e.HasKey(x => x.HorizontalPropertyId);
+            e.Property(x => x.MonthlyBudgetAmount).HasPrecision(18, 2);
+            e.Property(x => x.LateInterestMonthlyPercent).HasPrecision(18, 2);
+            e.Property(x => x.Notes).HasMaxLength(4000);
+            e.HasOne(x => x.HorizontalProperty)
+                .WithOne()
+                .HasForeignKey<FeeSettings>(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<BillingPeriod>(e =>
+        {
+            e.Property(x => x.Notes).HasMaxLength(4000);
+            e.HasOne(x => x.HorizontalProperty)
+                .WithMany()
+                .HasForeignKey(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Year, x.Month }).IsUnique();
+        });
+
+        modelBuilder.Entity<FeeCharge>(e =>
+        {
+            e.Property(x => x.Description).HasMaxLength(500);
+            e.Property(x => x.CoefficientSnapshot).HasPrecision(18, 5);
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.AmountPaid).HasPrecision(18, 2);
+            e.HasOne(x => x.HorizontalProperty)
+                .WithMany()
+                .HasForeignKey(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.BillingPeriod)
+                .WithMany(x => x.FeeCharges)
+                .HasForeignKey(x => x.BillingPeriodId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Unit)
+                .WithMany()
+                .HasForeignKey(x => x.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.BillingPeriodId, x.UnitId, x.ChargeType });
+            e.HasIndex(x => new { x.TenantId, x.UnitId, x.Status });
+        });
+
+        modelBuilder.Entity<Payment>(e =>
+        {
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.Reference).HasMaxLength(120);
+            e.Property(x => x.Notes).HasMaxLength(4000);
+            e.HasOne(x => x.HorizontalProperty)
+                .WithMany()
+                .HasForeignKey(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Unit)
+                .WithMany()
+                .HasForeignKey(x => x.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Person)
+                .WithMany()
+                .HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.UnitId });
+        });
+
+        modelBuilder.Entity<PaymentAllocation>(e =>
+        {
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.HasOne(x => x.Payment)
+                .WithMany(x => x.Allocations)
+                .HasForeignKey(x => x.PaymentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.FeeCharge)
+                .WithMany(x => x.Allocations)
+                .HasForeignKey(x => x.FeeChargeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.PaymentId, x.FeeChargeId }).IsUnique();
+        });
+
+        modelBuilder.Entity<CommonArea>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.DepositAmount).HasPrecision(18, 2);
+            e.Property(x => x.RulesNotes).HasMaxLength(4000);
+            e.HasOne(x => x.HorizontalProperty)
+                .WithMany(x => x.CommonAreas)
+                .HasForeignKey(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Name }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.AreaType });
+        });
+
+        modelBuilder.Entity<Reservation>(e =>
+        {
+            e.Property(x => x.Notes).HasMaxLength(4000);
+            e.HasOne(x => x.HorizontalProperty)
+                .WithMany()
+                .HasForeignKey(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.CommonArea)
+                .WithMany(x => x.Reservations)
+                .HasForeignKey(x => x.CommonAreaId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Unit)
+                .WithMany()
+                .HasForeignKey(x => x.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Person)
+                .WithMany()
+                .HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.CommonAreaId, x.StartsAtUtc });
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Status });
+        });
+
+        modelBuilder.Entity<ReceptionItem>(e =>
+        {
+            e.Property(x => x.CarrierOrSender).HasMaxLength(200);
+            e.Property(x => x.TrackingOrReference).HasMaxLength(120);
+            e.Property(x => x.RecipientName).HasMaxLength(200);
+            e.Property(x => x.Notes).HasMaxLength(4000);
+            e.HasOne(x => x.HorizontalProperty)
+                .WithMany()
+                .HasForeignKey(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Unit)
+                .WithMany()
+                .HasForeignKey(x => x.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Person)
+                .WithMany()
+                .HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ReceivedByEmployee)
+                .WithMany()
+                .HasForeignKey(x => x.ReceivedByEmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.DeliveredByEmployee)
+                .WithMany()
+                .HasForeignKey(x => x.DeliveredByEmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.UnitId, x.Status });
+        });
+
         ApplyTenantFilters(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
@@ -249,6 +401,30 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<UnitOccupancy>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<FeeSettings>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<BillingPeriod>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<FeeCharge>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<Payment>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<PaymentAllocation>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<CommonArea>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<Reservation>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<ReceptionItem>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
     }
 
