@@ -45,6 +45,13 @@ public sealed class FeatureAuthorizationTests
     [InlineData(typeof(RolePermissionsController), FeatureCodes.OrganizationRoles)]
     [InlineData(typeof(EmployeesController), FeatureCodes.OrganizationEmployees)]
     [InlineData(typeof(TenantSettingsController), FeatureCodes.SettingsTenant)]
+    [InlineData(typeof(NeighborhoodsController), FeatureCodes.StructureNeighborhoods)]
+    [InlineData(typeof(HorizontalPropertiesController), FeatureCodes.StructureProperties)]
+    [InlineData(typeof(BuildingsController), FeatureCodes.StructureBuildings)]
+    [InlineData(typeof(FloorsController), FeatureCodes.StructureFloors)]
+    [InlineData(typeof(UnitsController), FeatureCodes.StructureUnits)]
+    [InlineData(typeof(PeopleController), FeatureCodes.PeopleManage)]
+    [InlineData(typeof(UnitOccupanciesController), FeatureCodes.PeopleManage)]
     public void Secured_controllers_require_matching_feature(Type controllerType, string featureCode)
     {
         var attribute = controllerType.GetCustomAttribute<RequireFeatureAttribute>();

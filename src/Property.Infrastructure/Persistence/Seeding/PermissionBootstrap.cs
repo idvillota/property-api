@@ -12,6 +12,15 @@ public static class PermissionBootstrap
         ILogger logger,
         CancellationToken cancellationToken = default)
     {
+        await SyncFeatureCatalogAsync(db, logger, cancellationToken);
+        await GrantMissingDefaultRoleFeaturesAsync(db, logger, cancellationToken);
+    }
+
+    private static async Task SyncFeatureCatalogAsync(
+        ApplicationDbContext db,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
         var existing = await db.Features.AsNoTracking().ToListAsync(cancellationToken);
         var byCode = existing.ToDictionary(f => f.Code, StringComparer.Ordinal);
         var catalogCodes = FeatureCatalog.All.Select(f => f.Code).ToHashSet(StringComparer.Ordinal);
@@ -27,7 +36,6 @@ public static class PermissionBootstrap
                     || tracked.SortOrder != def.SortOrder
                     || tracked.Id != def.Id)
                 {
-                    // Keep stable catalog ids; recreate row if id drifted.
                     if (tracked.Id != def.Id)
                     {
                         db.Features.Remove(tracked);
@@ -98,5 +106,73 @@ public static class PermissionBootstrap
 
         await db.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Feature catalog synchronized ({Count} features).", FeatureCatalog.All.Length);
+    }
+
+    /// <summary>
+    /// Grants missing default features to system roles (Administrator/Owner/Manager)
+    /// so new Wave features appear without manual role edits.
+    /// </summary>
+    private static async Task GrantMissingDefaultRoleFeaturesAsync(
+        ApplicationDbContext db,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var featuresByCode = await db.Features
+            .AsNoTracking()
+            .ToDictionaryAsync(f => f.Code, f => f.Id, StringComparer.Ordinal, cancellationToken);
+
+        var roles = await db.Roles
+            .IgnoreQueryFilters()
+            .Where(r =>
+                r.NormalizedName == SystemRoles.Administrator.ToUpperInvariant()
+                || r.NormalizedName == SystemRoles.Owner.ToUpperInvariant()
+                || r.NormalizedName == SystemRoles.Manager.ToUpperInvariant())
+            .ToListAsync(cancellationToken);
+
+        if (roles.Count == 0)
+            return;
+
+        var roleIds = roles.Select(r => r.Id).ToList();
+        var existingLinks = await db.RoleFeatures
+            .IgnoreQueryFilters()
+            .Where(rf => roleIds.Contains(rf.RoleId))
+            .Select(rf => new { rf.RoleId, rf.FeatureId })
+            .ToListAsync(cancellationToken);
+        var existingSet = existingLinks
+            .Select(x => (x.RoleId, x.FeatureId))
+            .ToHashSet();
+
+        var added = 0;
+        foreach (var role in roles)
+        {
+            if (!FeatureCatalog.DefaultFeaturesByRole.TryGetValue(role.Name, out var codes))
+                continue;
+
+            foreach (var code in codes)
+            {
+                if (!featuresByCode.TryGetValue(code, out var featureId))
+                    continue;
+                if (existingSet.Contains((role.Id, featureId)))
+                    continue;
+
+                await db.RoleFeatures.AddAsync(
+                    new RoleFeature
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = role.TenantId,
+                        RoleId = role.Id,
+                        FeatureId = featureId,
+                    },
+                    cancellationToken);
+                existingSet.Add((role.Id, featureId));
+                added++;
+            }
+        }
+
+        if (added == 0)
+            return;
+
+        await db.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Granted {Count} missing default role feature link(s).", added);
     }
 }

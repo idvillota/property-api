@@ -37,6 +37,13 @@ public static class DependencyInjection
         services.AddScoped<ITenantSettingsService, TenantSettingsService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IRolePermissionService, RolePermissionService>();
+        services.AddScoped<INeighborhoodService, NeighborhoodService>();
+        services.AddScoped<IHorizontalPropertyService, HorizontalPropertyService>();
+        services.AddScoped<IBuildingService, BuildingService>();
+        services.AddScoped<IFloorService, FloorService>();
+        services.AddScoped<IUnitService, UnitService>();
+        services.AddScoped<IPersonService, PersonService>();
+        services.AddScoped<IUnitOccupancyService, UnitOccupancyService>();
 
         return services;
     }

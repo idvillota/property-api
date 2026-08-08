@@ -8,6 +8,12 @@ public static class FeatureCodes
     public const string OrganizationEmployees = "organization.employees";
     public const string OrganizationTeam = "organization.team";
     public const string OrganizationRoles = "organization.roles";
+    public const string StructureNeighborhoods = "structure.neighborhoods";
+    public const string StructureProperties = "structure.properties";
+    public const string StructureBuildings = "structure.buildings";
+    public const string StructureFloors = "structure.floors";
+    public const string StructureUnits = "structure.units";
+    public const string PeopleManage = "people.manage";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -17,5 +23,11 @@ public static class FeatureCodes
         OrganizationEmployees,
         OrganizationTeam,
         OrganizationRoles,
+        StructureNeighborhoods,
+        StructureProperties,
+        StructureBuildings,
+        StructureFloors,
+        StructureUnits,
+        PeopleManage,
     ];
 }

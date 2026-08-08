@@ -24,6 +24,13 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<TenantUserRole> TenantUserRoles => Set<TenantUserRole>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<TenantSettings> TenantSettings => Set<TenantSettings>();
+    public DbSet<Neighborhood> Neighborhoods => Set<Neighborhood>();
+    public DbSet<HorizontalProperty> HorizontalProperties => Set<HorizontalProperty>();
+    public DbSet<Building> Buildings => Set<Building>();
+    public DbSet<Floor> Floors => Set<Floor>();
+    public DbSet<Unit> Units => Set<Unit>();
+    public DbSet<Person> People => Set<Person>();
+    public DbSet<UnitOccupancy> UnitOccupancies => Set<UnitOccupancy>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -103,6 +110,102 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.DashboardLayoutJson);
         });
 
+        modelBuilder.Entity<Neighborhood>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.City).HasMaxLength(120);
+            e.Property(x => x.Country).HasMaxLength(80);
+            e.HasIndex(x => new { x.TenantId, x.Name });
+        });
+
+        modelBuilder.Entity<HorizontalProperty>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.TradeName).HasMaxLength(200);
+            e.Property(x => x.Nit).HasMaxLength(40);
+            e.Property(x => x.AddressLine).HasMaxLength(300);
+            e.Property(x => x.City).HasMaxLength(120);
+            e.Property(x => x.Country).HasMaxLength(80);
+            e.Property(x => x.MatriculaInmobiliaria).HasMaxLength(80);
+            e.Property(x => x.RegulationNotes).HasMaxLength(4000);
+            e.Property(x => x.CoefficientBasisNotes).HasMaxLength(4000);
+            e.HasOne(x => x.Neighborhood)
+                .WithMany()
+                .HasForeignKey(x => x.NeighborhoodId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.Name });
+        });
+
+        modelBuilder.Entity<Building>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Code).HasMaxLength(40);
+            e.HasOne(x => x.HorizontalProperty)
+                .WithMany(x => x.Buildings)
+                .HasForeignKey(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<Floor>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.HasOne(x => x.Building)
+                .WithMany(x => x.Floors)
+                .HasForeignKey(x => x.BuildingId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.BuildingId, x.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<Unit>(e =>
+        {
+            e.Property(x => x.Code).HasMaxLength(80);
+            e.Property(x => x.ContributionModuleCode).HasMaxLength(40);
+            e.Property(x => x.PrivateBuiltAreaM2).HasPrecision(18, 2);
+            e.Property(x => x.PrivateOpenAreaM2).HasPrecision(18, 2);
+            e.Property(x => x.Coefficient).HasPrecision(18, 5);
+            e.HasOne(x => x.HorizontalProperty)
+                .WithMany(x => x.Units)
+                .HasForeignKey(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Building)
+                .WithMany()
+                .HasForeignKey(x => x.BuildingId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Floor)
+                .WithMany()
+                .HasForeignKey(x => x.FloorId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.LinkedUnit)
+                .WithMany()
+                .HasForeignKey(x => x.LinkedUnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Code }).IsUnique();
+        });
+
+        modelBuilder.Entity<Person>(e =>
+        {
+            e.Property(x => x.DocumentNumber).HasMaxLength(40);
+            e.Property(x => x.FirstName).HasMaxLength(120);
+            e.Property(x => x.LastName).HasMaxLength(120);
+            e.Property(x => x.Email).HasMaxLength(320);
+            e.Property(x => x.Phone).HasMaxLength(40);
+            e.HasIndex(x => new { x.TenantId, x.DocumentType, x.DocumentNumber }).IsUnique();
+        });
+
+        modelBuilder.Entity<UnitOccupancy>(e =>
+        {
+            e.HasOne(x => x.Unit)
+                .WithMany()
+                .HasForeignKey(x => x.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Person)
+                .WithMany()
+                .HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.UnitId, x.PersonId, x.StartDate });
+        });
+
         ApplyTenantFilters(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
@@ -125,6 +228,27 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<TenantSettings>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<Neighborhood>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<HorizontalProperty>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<Building>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<Floor>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<Unit>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<Person>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<UnitOccupancy>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
     }
 

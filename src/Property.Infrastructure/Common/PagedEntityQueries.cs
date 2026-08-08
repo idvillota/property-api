@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Property.Application.Common.Models;
 using Property.Domain.Entities;
+using Property.Domain.Enums;
 
 namespace Property.Infrastructure.Common;
 
@@ -41,6 +42,271 @@ internal static class PagedEntityQueries
             "jobtitle" => desc ? query.OrderByDescending(e => e.JobTitle) : query.OrderBy(e => e.JobTitle),
             "isactive" => desc ? query.OrderByDescending(e => e.IsActive) : query.OrderBy(e => e.IsActive),
             _ => desc ? query.OrderByDescending(e => e.FullName) : query.OrderBy(e => e.FullName),
+        };
+    }
+
+    public static IQueryable<Neighborhood> ShapeNeighborhoods(IQueryable<Neighborhood> query, ListQuery q)
+    {
+        if (!q.IncludeInactive)
+            query = query.Where(e => e.IsActive);
+
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+        {
+            query = query.Where(e =>
+                EF.Functions.ILike(e.Name, EfTextSearch.LikePattern(search)) ||
+                (e.City != null && EF.Functions.ILike(e.City, EfTextSearch.LikePattern(search))));
+        }
+
+        if (q.FilterValue("city") is { } cityFilter)
+            query = query.Where(e => e.City != null && EF.Functions.ILike(e.City, EfTextSearch.LikePattern(cityFilter)));
+
+        if (q.FilterValue("isActive") is { } activeRaw &&
+            ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
+            query = query.Where(e => e.IsActive == isActive);
+
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "name") switch
+        {
+            "city" => desc ? query.OrderByDescending(e => e.City) : query.OrderBy(e => e.City),
+            "isactive" => desc ? query.OrderByDescending(e => e.IsActive) : query.OrderBy(e => e.IsActive),
+            _ => desc ? query.OrderByDescending(e => e.Name) : query.OrderBy(e => e.Name),
+        };
+    }
+
+    public static IQueryable<HorizontalProperty> ShapeHorizontalProperties(IQueryable<HorizontalProperty> query, ListQuery q)
+    {
+        if (!q.IncludeInactive)
+            query = query.Where(e => e.IsActive);
+
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+        {
+            query = query.Where(e =>
+                EF.Functions.ILike(e.Name, EfTextSearch.LikePattern(search)) ||
+                (e.TradeName != null && EF.Functions.ILike(e.TradeName, EfTextSearch.LikePattern(search))) ||
+                EF.Functions.ILike(e.City, EfTextSearch.LikePattern(search)) ||
+                EF.Functions.ILike(e.AddressLine, EfTextSearch.LikePattern(search)));
+        }
+
+        if (q.FilterValue("neighborhoodId") is { } neighborhoodRaw &&
+            ListQueryHelpers.TryParseGuid(neighborhoodRaw, out var neighborhoodId))
+            query = query.Where(e => e.NeighborhoodId == neighborhoodId);
+
+        if (q.FilterValue("city") is { } cityFilter)
+            query = query.Where(e => EF.Functions.ILike(e.City, EfTextSearch.LikePattern(cityFilter)));
+
+        if (q.FilterValue("propertyUseType") is { } useRaw &&
+            Enum.TryParse<PropertyUseType>(useRaw, ignoreCase: true, out var useType))
+            query = query.Where(e => e.PropertyUseType == useType);
+
+        if (q.FilterValue("isActive") is { } activeRaw &&
+            ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
+            query = query.Where(e => e.IsActive == isActive);
+
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "name") switch
+        {
+            "city" => desc ? query.OrderByDescending(e => e.City) : query.OrderBy(e => e.City),
+            "propertyusetype" => desc ? query.OrderByDescending(e => e.PropertyUseType) : query.OrderBy(e => e.PropertyUseType),
+            "isactive" => desc ? query.OrderByDescending(e => e.IsActive) : query.OrderBy(e => e.IsActive),
+            _ => desc ? query.OrderByDescending(e => e.Name) : query.OrderBy(e => e.Name),
+        };
+    }
+
+    public static IQueryable<Building> ShapeBuildings(IQueryable<Building> query, ListQuery q)
+    {
+        if (!q.IncludeInactive)
+            query = query.Where(e => e.IsActive);
+
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+        {
+            query = query.Where(e =>
+                EF.Functions.ILike(e.Name, EfTextSearch.LikePattern(search)) ||
+                (e.Code != null && EF.Functions.ILike(e.Code, EfTextSearch.LikePattern(search))));
+        }
+
+        if (q.FilterValue("horizontalPropertyId") is { } hpRaw &&
+            ListQueryHelpers.TryParseGuid(hpRaw, out var horizontalPropertyId))
+            query = query.Where(e => e.HorizontalPropertyId == horizontalPropertyId);
+
+        if (q.FilterValue("isActive") is { } activeRaw &&
+            ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
+            query = query.Where(e => e.IsActive == isActive);
+
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "sortorder") switch
+        {
+            "name" => desc ? query.OrderByDescending(e => e.Name) : query.OrderBy(e => e.Name),
+            "code" => desc ? query.OrderByDescending(e => e.Code) : query.OrderBy(e => e.Code),
+            "isactive" => desc ? query.OrderByDescending(e => e.IsActive) : query.OrderBy(e => e.IsActive),
+            _ => desc
+                ? query.OrderByDescending(e => e.SortOrder).ThenByDescending(e => e.Name)
+                : query.OrderBy(e => e.SortOrder).ThenBy(e => e.Name),
+        };
+    }
+
+    public static IQueryable<Floor> ShapeFloors(IQueryable<Floor> query, IQueryable<Building> buildings, ListQuery q)
+    {
+        if (!q.IncludeInactive)
+            query = query.Where(e => e.IsActive);
+
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+            query = query.Where(e => EF.Functions.ILike(e.Name, EfTextSearch.LikePattern(search)));
+
+        if (q.FilterValue("buildingId") is { } buildingRaw &&
+            ListQueryHelpers.TryParseGuid(buildingRaw, out var buildingId))
+            query = query.Where(e => e.BuildingId == buildingId);
+
+        if (q.FilterValue("horizontalPropertyId") is { } hpRaw &&
+            ListQueryHelpers.TryParseGuid(hpRaw, out var horizontalPropertyId))
+        {
+            query = query.Where(e =>
+                buildings.Any(b => b.Id == e.BuildingId && b.HorizontalPropertyId == horizontalPropertyId));
+        }
+
+        if (q.FilterValue("isActive") is { } activeRaw &&
+            ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
+            query = query.Where(e => e.IsActive == isActive);
+
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "sortorder") switch
+        {
+            "name" => desc ? query.OrderByDescending(e => e.Name) : query.OrderBy(e => e.Name),
+            "number" => desc ? query.OrderByDescending(e => e.Number) : query.OrderBy(e => e.Number),
+            "isactive" => desc ? query.OrderByDescending(e => e.IsActive) : query.OrderBy(e => e.IsActive),
+            _ => desc
+                ? query.OrderByDescending(e => e.SortOrder).ThenByDescending(e => e.Name)
+                : query.OrderBy(e => e.SortOrder).ThenBy(e => e.Name),
+        };
+    }
+
+    public static IQueryable<Unit> ShapeUnits(IQueryable<Unit> query, ListQuery q)
+    {
+        if (!q.IncludeInactive)
+            query = query.Where(e => e.IsActive);
+
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+        {
+            query = query.Where(e =>
+                EF.Functions.ILike(e.Code, EfTextSearch.LikePattern(search)) ||
+                (e.ContributionModuleCode != null &&
+                 EF.Functions.ILike(e.ContributionModuleCode, EfTextSearch.LikePattern(search))));
+        }
+
+        if (q.FilterValue("horizontalPropertyId") is { } hpRaw &&
+            ListQueryHelpers.TryParseGuid(hpRaw, out var horizontalPropertyId))
+            query = query.Where(e => e.HorizontalPropertyId == horizontalPropertyId);
+
+        if (q.FilterValue("buildingId") is { } buildingRaw &&
+            ListQueryHelpers.TryParseGuid(buildingRaw, out var buildingId))
+            query = query.Where(e => e.BuildingId == buildingId);
+
+        if (q.FilterValue("floorId") is { } floorRaw &&
+            ListQueryHelpers.TryParseGuid(floorRaw, out var floorId))
+            query = query.Where(e => e.FloorId == floorId);
+
+        if (q.FilterValue("unitType") is { } unitTypeRaw &&
+            Enum.TryParse<UnitType>(unitTypeRaw, ignoreCase: true, out var unitType))
+            query = query.Where(e => e.UnitType == unitType);
+
+        if (q.FilterValue("isBillable") is { } billableRaw &&
+            ListQueryHelpers.TryParseBool(billableRaw, out var isBillable))
+            query = query.Where(e => e.IsBillable == isBillable);
+
+        if (q.FilterValue("isActive") is { } activeRaw &&
+            ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
+            query = query.Where(e => e.IsActive == isActive);
+
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "code") switch
+        {
+            "coefficient" => desc ? query.OrderByDescending(e => e.Coefficient) : query.OrderBy(e => e.Coefficient),
+            "unittype" => desc ? query.OrderByDescending(e => e.UnitType) : query.OrderBy(e => e.UnitType),
+            "isactive" => desc ? query.OrderByDescending(e => e.IsActive) : query.OrderBy(e => e.IsActive),
+            _ => desc ? query.OrderByDescending(e => e.Code) : query.OrderBy(e => e.Code),
+        };
+    }
+
+    public static IQueryable<Person> ShapePeople(IQueryable<Person> query, ListQuery q)
+    {
+        if (!q.IncludeInactive)
+            query = query.Where(e => e.IsActive);
+
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+        {
+            query = query.Where(e =>
+                EF.Functions.ILike(e.FirstName, EfTextSearch.LikePattern(search)) ||
+                EF.Functions.ILike(e.LastName, EfTextSearch.LikePattern(search)) ||
+                EF.Functions.ILike(e.DocumentNumber, EfTextSearch.LikePattern(search)) ||
+                (e.Email != null && EF.Functions.ILike(e.Email, EfTextSearch.LikePattern(search))));
+        }
+
+        if (q.FilterValue("documentType") is { } docTypeRaw &&
+            Enum.TryParse<DocumentType>(docTypeRaw, ignoreCase: true, out var documentType))
+            query = query.Where(e => e.DocumentType == documentType);
+
+        if (q.FilterValue("documentNumber") is { } documentNumber)
+            query = query.Where(e => EF.Functions.ILike(e.DocumentNumber, EfTextSearch.LikePattern(documentNumber)));
+
+        if (q.FilterValue("isActive") is { } activeRaw &&
+            ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
+            query = query.Where(e => e.IsActive == isActive);
+
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "lastname") switch
+        {
+            "firstname" => desc ? query.OrderByDescending(e => e.FirstName) : query.OrderBy(e => e.FirstName),
+            "documentnumber" => desc ? query.OrderByDescending(e => e.DocumentNumber) : query.OrderBy(e => e.DocumentNumber),
+            "isactive" => desc ? query.OrderByDescending(e => e.IsActive) : query.OrderBy(e => e.IsActive),
+            _ => desc
+                ? query.OrderByDescending(e => e.LastName).ThenByDescending(e => e.FirstName)
+                : query.OrderBy(e => e.LastName).ThenBy(e => e.FirstName),
+        };
+    }
+
+    public static IQueryable<UnitOccupancy> ShapeUnitOccupancies(
+        IQueryable<UnitOccupancy> query,
+        IQueryable<Unit> units,
+        ListQuery q)
+    {
+        if (!q.IncludeInactive)
+            query = query.Where(e => e.IsActive);
+
+        if (q.FilterValue("unitId") is { } unitRaw &&
+            ListQueryHelpers.TryParseGuid(unitRaw, out var unitId))
+            query = query.Where(e => e.UnitId == unitId);
+
+        if (q.FilterValue("personId") is { } personRaw &&
+            ListQueryHelpers.TryParseGuid(personRaw, out var personId))
+            query = query.Where(e => e.PersonId == personId);
+
+        if (q.FilterValue("horizontalPropertyId") is { } hpRaw &&
+            ListQueryHelpers.TryParseGuid(hpRaw, out var horizontalPropertyId))
+        {
+            query = query.Where(e =>
+                units.Any(u => u.Id == e.UnitId && u.HorizontalPropertyId == horizontalPropertyId));
+        }
+
+        if (q.FilterValue("role") is { } roleRaw &&
+            Enum.TryParse<OccupancyRole>(roleRaw, ignoreCase: true, out var role))
+            query = query.Where(e => e.Role == role);
+
+        if (q.FilterValue("isActive") is { } activeRaw &&
+            ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
+            query = query.Where(e => e.IsActive == isActive);
+
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "startdate") switch
+        {
+            "role" => desc ? query.OrderByDescending(e => e.Role) : query.OrderBy(e => e.Role),
+            "enddate" => desc ? query.OrderByDescending(e => e.EndDate) : query.OrderBy(e => e.EndDate),
+            "isactive" => desc ? query.OrderByDescending(e => e.IsActive) : query.OrderBy(e => e.IsActive),
+            _ => desc ? query.OrderByDescending(e => e.StartDate) : query.OrderBy(e => e.StartDate),
         };
     }
 }
