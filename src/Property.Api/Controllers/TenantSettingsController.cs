@@ -27,6 +27,13 @@ public sealed class TenantSettingsController : ControllerBase
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
 
-        return Ok(await _service.UpdateAsync(dto, cancellationToken));
+        try
+        {
+            return Ok(await _service.UpdateAsync(dto, cancellationToken));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 }

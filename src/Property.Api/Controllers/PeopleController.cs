@@ -29,6 +29,13 @@ public sealed class PeopleController : ControllerBase
         return item is null ? NotFound() : Ok(item);
     }
 
+    [HttpGet("{id:guid}/overview")]
+    public async Task<ActionResult<PersonOverviewDto>> GetOverview(Guid id, CancellationToken cancellationToken = default)
+    {
+        var item = await _service.GetOverviewAsync(id, cancellationToken);
+        return item is null ? NotFound() : Ok(item);
+    }
+
     [HttpPost]
     public async Task<ActionResult<PersonDto>> Create(
         [FromBody] CreatePersonDto dto,

@@ -40,10 +40,35 @@ public sealed class UnitsController : ControllerBase
         }
     }
 
+    [HttpPost("recalculate-coefficients")]
+    public async Task<ActionResult<UnitCoefficientSummaryDto>> RecalculateCoefficients(
+        [FromQuery] Guid horizontalPropertyId,
+        CancellationToken cancellationToken = default)
+    {
+        if (horizontalPropertyId == Guid.Empty)
+            return BadRequest(new { message = "horizontalPropertyId is required." });
+
+        try
+        {
+            return Ok(await _service.RecalculateCoefficientsAsync(horizontalPropertyId, cancellationToken));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<UnitDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
         var item = await _service.GetByIdAsync(id, cancellationToken);
+        return item is null ? NotFound() : Ok(item);
+    }
+
+    [HttpGet("{id:guid}/household")]
+    public async Task<ActionResult<UnitHouseholdDto>> GetHousehold(Guid id, CancellationToken cancellationToken = default)
+    {
+        var item = await _service.GetHouseholdAsync(id, cancellationToken);
         return item is null ? NotFound() : Ok(item);
     }
 

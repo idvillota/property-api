@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +8,9 @@ using Microsoft.OpenApi;
 using Property.Api.Authorization;
 using Property.Api.Middleware;
 using Property.Application;
+using Property.Application.Common.Interfaces;
 using Property.Infrastructure;
+using Property.Infrastructure.Common;
 using Property.Infrastructure.Identity;
 using Property.Infrastructure.Persistence;
 using Property.Infrastructure.Persistence.Seeding;
@@ -38,7 +41,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 // Secured controllers use [RequireFeature]; public endpoints use [AllowAnonymous].
 builder.Services.AddFeatureAuthorization();
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -96,6 +103,21 @@ using (var scope = app.Services.CreateScope())
 
     var permissionLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     await PermissionBootstrap.EnsureAsync(db, permissionLogger, CancellationToken.None);
+
+    if (isLocal)
+    {
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ICurrentTenantContext>();
+        if (tenantContext is not CurrentTenantContext currentTenant)
+            throw new InvalidOperationException("CurrentTenantContext is required for development seeding.");
+
+        await DevelopmentDataSeeder.SeedAsync(
+            db,
+            passwordHasher,
+            currentTenant,
+            permissionLogger,
+            CancellationToken.None);
+    }
 }
 
 if (isLocal)

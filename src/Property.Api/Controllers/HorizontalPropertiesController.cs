@@ -22,6 +22,14 @@ public sealed class HorizontalPropertiesController : ControllerBase
         CancellationToken cancellationToken = default) =>
         Ok(await _service.ListAsync(query, cancellationToken));
 
+    /// <summary>Returns the single horizontal property for the current tenant (Colombia 1:1 model).</summary>
+    [HttpGet("current")]
+    public async Task<ActionResult<HorizontalPropertyDto>> GetCurrent(CancellationToken cancellationToken = default)
+    {
+        var item = await _service.GetCurrentAsync(cancellationToken);
+        return item is null ? NotFound() : Ok(item);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<HorizontalPropertyDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
@@ -71,7 +79,14 @@ public sealed class HorizontalPropertiesController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> SoftDelete(Guid id, CancellationToken cancellationToken = default)
     {
-        var ok = await _service.SoftDeleteAsync(id, cancellationToken);
-        return ok ? NoContent() : NotFound();
+        try
+        {
+            await _service.SoftDeleteAsync(id, cancellationToken);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 }
