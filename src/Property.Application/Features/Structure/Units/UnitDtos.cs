@@ -42,7 +42,8 @@ public sealed class CreateUnitDto
     [Range(0, double.MaxValue)]
     public decimal? PrivateOpenAreaM2 { get; set; }
 
-    public decimal Coefficient { get; set; }
+    /// <summary>Ignored; coefficient is calculated from private built area.</summary>
+    public decimal? Coefficient { get; set; }
 
     [MaxLength(40)]
     public string? ContributionModuleCode { get; set; }
@@ -74,7 +75,8 @@ public sealed class UpdateUnitDto
     [Range(0, double.MaxValue)]
     public decimal? PrivateOpenAreaM2 { get; set; }
 
-    public decimal Coefficient { get; set; }
+    /// <summary>Ignored; coefficient is calculated from private built area.</summary>
+    public decimal? Coefficient { get; set; }
 
     [MaxLength(40)]
     public string? ContributionModuleCode { get; set; }

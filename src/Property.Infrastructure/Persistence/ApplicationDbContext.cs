@@ -130,10 +130,15 @@ public sealed class ApplicationDbContext : DbContext
         {
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.TradeName).HasMaxLength(200);
+            e.Property(x => x.LegalName).HasMaxLength(200);
             e.Property(x => x.Nit).HasMaxLength(40);
+            e.Property(x => x.TaxRegime).HasMaxLength(80);
+            e.Property(x => x.LegalRepresentative).HasMaxLength(200);
             e.Property(x => x.AddressLine).HasMaxLength(300);
             e.Property(x => x.City).HasMaxLength(120);
             e.Property(x => x.Country).HasMaxLength(80);
+            e.Property(x => x.PostalCode).HasMaxLength(20);
+            e.Property(x => x.Phone).HasMaxLength(40);
             e.Property(x => x.MatriculaInmobiliaria).HasMaxLength(80);
             e.Property(x => x.RegulationNotes).HasMaxLength(4000);
             e.Property(x => x.CoefficientBasisNotes).HasMaxLength(4000);
@@ -141,7 +146,8 @@ public sealed class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.NeighborhoodId)
                 .OnDelete(DeleteBehavior.Restrict);
-            e.HasIndex(x => new { x.TenantId, x.Name });
+            // Colombia model: one SaaS tenant administers exactly one horizontal property.
+            e.HasIndex(x => x.TenantId).IsUnique();
         });
 
         modelBuilder.Entity<Building>(e =>

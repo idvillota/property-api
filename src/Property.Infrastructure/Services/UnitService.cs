@@ -4,6 +4,7 @@ using Property.Application.Common.Models;
 using Property.Application.Features.Structure.Units;
 using Property.Domain.Common;
 using Property.Domain.Entities;
+using Property.Domain.Enums;
 using Property.Infrastructure.Common;
 
 namespace Property.Infrastructure.Services;
@@ -14,6 +15,8 @@ public sealed class UnitService : IUnitService
     private readonly IRepository<HorizontalProperty> _properties;
     private readonly IRepository<Building> _buildings;
     private readonly IRepository<Floor> _floors;
+    private readonly IRepository<UnitOccupancy> _occupancies;
+    private readonly IRepository<Person> _people;
     private readonly IUnitOfWork _unitOfWork;
 
     public UnitService(
@@ -21,12 +24,16 @@ public sealed class UnitService : IUnitService
         IRepository<HorizontalProperty> properties,
         IRepository<Building> buildings,
         IRepository<Floor> floors,
+        IRepository<UnitOccupancy> occupancies,
+        IRepository<Person> people,
         IUnitOfWork unitOfWork)
     {
         _units = units;
         _properties = properties;
         _buildings = buildings;
         _floors = floors;
+        _occupancies = occupancies;
+        _people = people;
         _unitOfWork = unitOfWork;
     }
 
@@ -47,7 +54,6 @@ public sealed class UnitService : IUnitService
     public async Task<UnitDto> CreateAsync(CreateUnitDto dto, CancellationToken cancellationToken = default)
     {
         ValidateStructure(dto.BuildingId, dto.FloorId, dto.LinkedUnitId, unitId: null);
-        CoefficientRules.EnsureValid(dto.Coefficient);
         await EnsureReferencesAsync(dto.HorizontalPropertyId, dto.BuildingId, dto.FloorId, dto.LinkedUnitId, cancellationToken);
 
         var entity = new Unit
@@ -60,13 +66,14 @@ public sealed class UnitService : IUnitService
             UnitType = dto.UnitType,
             PrivateBuiltAreaM2 = dto.PrivateBuiltAreaM2,
             PrivateOpenAreaM2 = dto.PrivateOpenAreaM2,
-            Coefficient = dto.Coefficient,
+            Coefficient = 0m,
             ContributionModuleCode = dto.ContributionModuleCode?.Trim(),
             LinkedUnitId = dto.LinkedUnitId,
             IsBillable = dto.IsBillable,
             IsActive = true,
         };
         await _units.AddAsync(entity, cancellationToken);
+        await RecalculateCoefficientsAsync(dto.HorizontalPropertyId, entity, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Map(entity);
     }
@@ -78,7 +85,6 @@ public sealed class UnitService : IUnitService
             return null;
 
         ValidateStructure(dto.BuildingId, dto.FloorId, dto.LinkedUnitId, unitId: id);
-        CoefficientRules.EnsureValid(dto.Coefficient);
         await EnsureReferencesAsync(dto.HorizontalPropertyId, dto.BuildingId, dto.FloorId, dto.LinkedUnitId, cancellationToken);
 
         entity.HorizontalPropertyId = dto.HorizontalPropertyId;
@@ -88,12 +94,13 @@ public sealed class UnitService : IUnitService
         entity.UnitType = dto.UnitType;
         entity.PrivateBuiltAreaM2 = dto.PrivateBuiltAreaM2;
         entity.PrivateOpenAreaM2 = dto.PrivateOpenAreaM2;
-        entity.Coefficient = dto.Coefficient;
         entity.ContributionModuleCode = dto.ContributionModuleCode?.Trim();
         entity.LinkedUnitId = dto.LinkedUnitId;
         entity.IsBillable = dto.IsBillable;
         entity.IsActive = dto.IsActive;
         _units.Update(entity);
+
+        await RecalculateCoefficientsAsync(dto.HorizontalPropertyId, newlyAdded: null, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Map(entity);
     }
@@ -104,8 +111,11 @@ public sealed class UnitService : IUnitService
         if (entity is null || !entity.IsActive)
             return false;
 
+        var propertyId = entity.HorizontalPropertyId;
         entity.IsActive = false;
+        entity.Coefficient = 0m;
         _units.Update(entity);
+        await RecalculateCoefficientsAsync(propertyId, newlyAdded: null, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return true;
     }
@@ -118,6 +128,26 @@ public sealed class UnitService : IUnitService
         if (!exists)
             throw new InvalidOperationException("Horizontal property was not found.");
 
+        return await BuildSummaryAsync(horizontalPropertyId, cancellationToken);
+    }
+
+    public async Task<UnitCoefficientSummaryDto> RecalculateCoefficientsAsync(
+        Guid horizontalPropertyId,
+        CancellationToken cancellationToken = default)
+    {
+        var exists = await _properties.Query().AnyAsync(p => p.Id == horizontalPropertyId, cancellationToken);
+        if (!exists)
+            throw new InvalidOperationException("Horizontal property was not found.");
+
+        await RecalculateCoefficientsAsync(horizontalPropertyId, newlyAdded: null, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return await BuildSummaryAsync(horizontalPropertyId, cancellationToken);
+    }
+
+    private async Task<UnitCoefficientSummaryDto> BuildSummaryAsync(
+        Guid horizontalPropertyId,
+        CancellationToken cancellationToken)
+    {
         var activeUnits = _units.Query().AsNoTracking()
             .Where(u => u.HorizontalPropertyId == horizontalPropertyId && u.IsActive);
 
@@ -130,6 +160,32 @@ public sealed class UnitService : IUnitService
             UnitCount = unitCount,
             RemainingToHundred = CoefficientRules.Total - totalCoefficient,
         };
+    }
+
+    /// <summary>
+    /// Recalculates coefficients for all active units in the property from private built area.
+    /// </summary>
+    private async Task RecalculateCoefficientsAsync(
+        Guid horizontalPropertyId,
+        Unit? newlyAdded,
+        CancellationToken cancellationToken)
+    {
+        var units = await _units.Query()
+            .Where(u => u.HorizontalPropertyId == horizontalPropertyId && u.IsActive)
+            .OrderBy(u => u.Code)
+            .ToListAsync(cancellationToken);
+
+        if (newlyAdded is not null && units.All(u => u.Id != newlyAdded.Id))
+            units.Add(newlyAdded);
+
+        CoefficientCalculator.ApplyAreaProportional(units);
+
+        foreach (var unit in units)
+        {
+            if (newlyAdded is not null && unit.Id == newlyAdded.Id)
+                continue;
+            _units.Update(unit);
+        }
     }
 
     private static void ValidateStructure(Guid? buildingId, Guid? floorId, Guid? linkedUnitId, Guid? unitId)
@@ -178,6 +234,78 @@ public sealed class UnitService : IUnitService
             if (!linkedExists)
                 throw new InvalidOperationException("Linked unit was not found.");
         }
+    }
+
+    public async Task<UnitHouseholdDto?> GetHouseholdAsync(Guid unitId, CancellationToken cancellationToken = default)
+    {
+        var unit = await _units.Query().AsNoTracking().FirstOrDefaultAsync(u => u.Id == unitId, cancellationToken);
+        if (unit is null)
+            return null;
+
+        string? buildingName = null;
+        if (unit.BuildingId is { } buildingId)
+        {
+            buildingName = await _buildings.Query().AsNoTracking()
+                .Where(b => b.Id == buildingId)
+                .Select(b => b.Name)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        string? floorName = null;
+        if (unit.FloorId is { } floorId)
+        {
+            floorName = await _floors.Query().AsNoTracking()
+                .Where(f => f.Id == floorId)
+                .Select(f => f.Name)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        var rows = await (
+            from o in _occupancies.Query().AsNoTracking()
+            join p in _people.Query().AsNoTracking() on o.PersonId equals p.Id
+            where o.UnitId == unitId && o.IsActive
+            orderby o.Role, p.LastName, p.FirstName
+            select new { Occupancy = o, Person = p }
+        ).ToListAsync(cancellationToken);
+
+        static UnitHouseholdPersonDto ToPerson(UnitOccupancy o, Person p) =>
+            new()
+            {
+                PersonId = p.Id,
+                FullName = $"{p.FirstName} {p.LastName}".Trim(),
+                DocumentLabel = $"{p.DocumentType} {p.DocumentNumber}",
+                Email = p.Email,
+                Phone = p.Phone,
+                Role = o.Role,
+                IsPrimary = o.IsPrimary,
+                ReceivesBilling = o.ReceivesBilling,
+            };
+
+        var habitants = rows
+            .Where(r => r.Occupancy.Role != OccupancyRole.Owner)
+            .Select(r => ToPerson(r.Occupancy, r.Person))
+            .ToList();
+
+        var habitantIds = habitants.Select(h => h.PersonId).ToHashSet();
+        var owners = rows
+            .Where(r => r.Occupancy.Role == OccupancyRole.Owner && !habitantIds.Contains(r.Person.Id))
+            .Select(r => ToPerson(r.Occupancy, r.Person))
+            .ToList();
+
+        return new UnitHouseholdDto
+        {
+            UnitId = unit.Id,
+            UnitCode = unit.Code,
+            UnitType = unit.UnitType,
+            BuildingId = unit.BuildingId,
+            BuildingName = buildingName,
+            FloorId = unit.FloorId,
+            FloorName = floorName,
+            PrivateBuiltAreaM2 = unit.PrivateBuiltAreaM2,
+            Coefficient = unit.Coefficient,
+            Owners = owners,
+            Habitants = habitants,
+        };
     }
 
     private static UnitDto Map(Unit entity) =>

@@ -413,6 +413,14 @@ namespace Property.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("LegalName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("LegalRepresentative")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("MatriculaInmobiliaria")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
@@ -429,12 +437,24 @@ namespace Property.Infrastructure.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
 
+                    b.Property<string>("Phone")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("PostalCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<int>("PropertyUseType")
                         .HasColumnType("integer");
 
                     b.Property<string>("RegulationNotes")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("TaxRegime")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -450,7 +470,8 @@ namespace Property.Infrastructure.Migrations
 
                     b.HasIndex("NeighborhoodId");
 
-                    b.HasIndex("TenantId", "Name");
+                    b.HasIndex("TenantId")
+                        .IsUnique();
 
                     b.ToTable("HorizontalProperties");
                 });

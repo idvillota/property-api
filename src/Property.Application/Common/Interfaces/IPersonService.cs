@@ -10,4 +10,5 @@ public interface IPersonService
     Task<PersonDto> CreateAsync(CreatePersonDto dto, CancellationToken cancellationToken = default);
     Task<PersonDto?> UpdateAsync(Guid id, UpdatePersonDto dto, CancellationToken cancellationToken = default);
     Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<PersonOverviewDto?> GetOverviewAsync(Guid id, CancellationToken cancellationToken = default);
 }

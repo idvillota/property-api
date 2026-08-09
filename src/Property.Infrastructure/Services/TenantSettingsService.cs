@@ -2,10 +2,15 @@ using Microsoft.EntityFrameworkCore;
 using Property.Application.Common.Interfaces;
 using Property.Application.Features.Organization.TenantSettings;
 using Property.Domain.Entities;
+using Property.Domain.Enums;
 using Property.Infrastructure.Persistence;
 
 namespace Property.Infrastructure.Services;
 
+/// <summary>
+/// Tenant identity settings mirror the single HorizontalProperty for the tenant.
+/// Dashboard layout JSON remains on TenantSettings.
+/// </summary>
 public sealed class TenantSettingsService : ITenantSettingsService
 {
     private readonly ApplicationDbContext _db;
@@ -19,6 +24,10 @@ public sealed class TenantSettingsService : ITenantSettingsService
 
     public async Task<TenantSettingsDto> GetAsync(CancellationToken cancellationToken = default)
     {
+        var property = await _db.HorizontalProperties.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        if (property is not null)
+            return MapFromProperty(property);
+
         var settings = await GetOrCreateSettingsAsync(cancellationToken);
         return Map(settings);
     }
@@ -27,21 +36,59 @@ public sealed class TenantSettingsService : ITenantSettingsService
         UpdateTenantSettingsDto dto,
         CancellationToken cancellationToken = default)
     {
-        var settings = await GetOrCreateSettingsAsync(cancellationToken);
-        settings.TradeName = dto.TradeName.Trim();
-        settings.LegalName = dto.LegalName.Trim();
-        settings.TaxRegime = dto.TaxRegime.Trim();
-        settings.TaxId = dto.TaxId.Trim();
-        settings.LegalRepresentative = dto.LegalRepresentative?.Trim();
-        settings.AddressLine = dto.AddressLine.Trim();
-        settings.City = dto.City.Trim();
-        settings.Country = dto.Country.Trim();
-        settings.PostalCode = dto.PostalCode?.Trim();
-        settings.Phone = dto.Phone?.Trim();
+        var property = await _db.HorizontalProperties.FirstOrDefaultAsync(cancellationToken);
+        if (property is null)
+            throw new InvalidOperationException(
+                "Register the tenant property before saving configuration.");
 
+        if (dto.NeighborhoodId.HasValue)
+        {
+            var neighborhoodExists = await _db.Neighborhoods.AnyAsync(
+                n => n.Id == dto.NeighborhoodId.Value,
+                cancellationToken);
+            if (!neighborhoodExists)
+                throw new InvalidOperationException("Neighborhood was not found.");
+        }
+
+        property.Name = dto.Name.Trim();
+        property.TradeName = TrimOrNull(dto.TradeName);
+        property.LegalName = TrimOrNull(dto.LegalName);
+        property.TaxRegime = TrimOrNull(dto.TaxRegime);
+        property.Nit = TrimOrNull(dto.TaxId);
+        property.LegalRepresentative = TrimOrNull(dto.LegalRepresentative);
+        property.AddressLine = dto.AddressLine.Trim();
+        property.City = dto.City.Trim();
+        property.Country = string.IsNullOrWhiteSpace(dto.Country) ? "Colombia" : dto.Country.Trim();
+        property.PostalCode = TrimOrNull(dto.PostalCode);
+        property.Phone = TrimOrNull(dto.Phone);
+        property.NeighborhoodId = dto.NeighborhoodId;
+        if (dto.PropertyUseType.HasValue)
+            property.PropertyUseType = dto.PropertyUseType.Value;
+        property.MatriculaInmobiliaria = TrimOrNull(dto.MatriculaInmobiliaria);
+        property.RegulationNotes = TrimOrNull(dto.RegulationNotes);
+        property.CoefficientBasisNotes = TrimOrNull(dto.CoefficientBasisNotes);
+        property.IsActive = dto.IsActive;
+        _db.HorizontalProperties.Update(property);
+
+        var settings = await GetOrCreateSettingsAsync(cancellationToken);
+        ApplyIdentityToSettings(settings, property);
         _db.TenantSettings.Update(settings);
         await _db.SaveChangesAsync(cancellationToken);
-        return Map(settings);
+        return MapFromProperty(property);
+    }
+
+    private static void ApplyIdentityToSettings(TenantSettings settings, HorizontalProperty property)
+    {
+        settings.TradeName = property.TradeName ?? property.Name;
+        settings.LegalName = property.LegalName ?? property.Name;
+        settings.TaxRegime = property.TaxRegime ?? string.Empty;
+        settings.TaxId = property.Nit ?? string.Empty;
+        settings.LegalRepresentative = property.LegalRepresentative;
+        settings.AddressLine = property.AddressLine;
+        settings.City = property.City;
+        settings.Country = property.Country;
+        settings.PostalCode = property.PostalCode;
+        settings.Phone = property.Phone;
     }
 
     private async Task<TenantSettings> GetOrCreateSettingsAsync(CancellationToken cancellationToken)
@@ -67,9 +114,38 @@ public sealed class TenantSettingsService : ITenantSettingsService
         throw new InvalidOperationException("Tenant context is not available.");
     }
 
+    private static string? TrimOrNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static TenantSettingsDto MapFromProperty(HorizontalProperty property) =>
+        new()
+        {
+            PropertyId = property.Id,
+            Name = property.Name,
+            TradeName = property.TradeName ?? string.Empty,
+            LegalName = property.LegalName ?? string.Empty,
+            TaxRegime = property.TaxRegime ?? string.Empty,
+            TaxId = property.Nit ?? string.Empty,
+            LegalRepresentative = property.LegalRepresentative,
+            AddressLine = property.AddressLine,
+            City = property.City,
+            Country = property.Country,
+            PostalCode = property.PostalCode,
+            Phone = property.Phone,
+            NeighborhoodId = property.NeighborhoodId,
+            PropertyUseType = property.PropertyUseType,
+            MatriculaInmobiliaria = property.MatriculaInmobiliaria,
+            RegulationNotes = property.RegulationNotes,
+            CoefficientBasisNotes = property.CoefficientBasisNotes,
+            IsActive = property.IsActive,
+            HasProperty = true,
+        };
+
     private static TenantSettingsDto Map(TenantSettings settings) =>
         new()
         {
+            PropertyId = null,
+            Name = string.Empty,
             TradeName = settings.TradeName,
             LegalName = settings.LegalName,
             TaxRegime = settings.TaxRegime,
@@ -80,5 +156,12 @@ public sealed class TenantSettingsService : ITenantSettingsService
             Country = settings.Country,
             PostalCode = settings.PostalCode,
             Phone = settings.Phone,
+            NeighborhoodId = null,
+            PropertyUseType = PropertyUseType.Residential,
+            MatriculaInmobiliaria = null,
+            RegulationNotes = null,
+            CoefficientBasisNotes = null,
+            IsActive = true,
+            HasProperty = false,
         };
 }

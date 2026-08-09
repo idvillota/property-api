@@ -11,4 +11,6 @@ public interface IUnitService
     Task<UnitDto?> UpdateAsync(Guid id, UpdateUnitDto dto, CancellationToken cancellationToken = default);
     Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
     Task<UnitCoefficientSummaryDto> GetCoefficientSummaryAsync(Guid horizontalPropertyId, CancellationToken cancellationToken = default);
+    Task<UnitCoefficientSummaryDto> RecalculateCoefficientsAsync(Guid horizontalPropertyId, CancellationToken cancellationToken = default);
+    Task<UnitHouseholdDto?> GetHouseholdAsync(Guid unitId, CancellationToken cancellationToken = default);
 }

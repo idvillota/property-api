@@ -225,6 +225,9 @@ internal static class PagedEntityQueries
         return (q.SortBy?.ToLowerInvariant() ?? "code") switch
         {
             "coefficient" => desc ? query.OrderByDescending(e => e.Coefficient) : query.OrderBy(e => e.Coefficient),
+            "privatebuiltaream2" => desc
+                ? query.OrderByDescending(e => e.PrivateBuiltAreaM2)
+                : query.OrderBy(e => e.PrivateBuiltAreaM2),
             "unittype" => desc ? query.OrderByDescending(e => e.UnitType) : query.OrderBy(e => e.UnitType),
             "isactive" => desc ? query.OrderByDescending(e => e.IsActive) : query.OrderBy(e => e.IsActive),
             _ => desc ? query.OrderByDescending(e => e.Code) : query.OrderBy(e => e.Code),
@@ -397,6 +400,10 @@ internal static class PagedEntityQueries
             ListQueryHelpers.TryParseGuid(unitRaw, out var unitId))
             query = query.Where(e => e.UnitId == unitId);
 
+        if (q.FilterValue("personId") is { } personRaw &&
+            ListQueryHelpers.TryParseGuid(personRaw, out var personId))
+            query = query.Where(e => e.PersonId == personId);
+
         if (q.FilterValue("isActive") is { } activeRaw &&
             ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
             query = query.Where(e => e.IsActive == isActive);
@@ -470,6 +477,10 @@ internal static class PagedEntityQueries
         if (q.FilterValue("unitId") is { } unitRaw &&
             ListQueryHelpers.TryParseGuid(unitRaw, out var unitId))
             query = query.Where(e => e.UnitId == unitId);
+
+        if (q.FilterValue("personId") is { } personRaw &&
+            ListQueryHelpers.TryParseGuid(personRaw, out var personId))
+            query = query.Where(e => e.PersonId == personId);
 
         if (q.FilterValue("status") is { } statusRaw &&
             Enum.TryParse<ReservationStatus>(statusRaw, ignoreCase: true, out var status))
