@@ -8,4 +8,5 @@ public enum UnitType
     Storage = 3,
     Commercial = 4,
     Other = 5,
+    Terrace = 6,
 }

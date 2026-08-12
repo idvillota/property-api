@@ -64,7 +64,7 @@ public sealed class ReservationService : IReservationService
             cancellationToken);
 
         if (dto.AttendeesCount > area.Capacity)
-            throw new InvalidOperationException("AttendeesCount cannot exceed the common area capacity.");
+            throw new InvalidOperationException("La cantidad de asistentes supera el aforo de la zona común.");
 
         if (OverlapStatuses.Contains(dto.Status))
             await EnsureNoOverlapAsync(dto.CommonAreaId, dto.StartsAtUtc, dto.EndsAtUtc, excludeId: null, cancellationToken);
@@ -104,7 +104,7 @@ public sealed class ReservationService : IReservationService
             cancellationToken);
 
         if (dto.AttendeesCount > area.Capacity)
-            throw new InvalidOperationException("AttendeesCount cannot exceed the common area capacity.");
+            throw new InvalidOperationException("La cantidad de asistentes supera el aforo de la zona común.");
 
         if (OverlapStatuses.Contains(dto.Status) && dto.IsActive)
             await EnsureNoOverlapAsync(dto.CommonAreaId, dto.StartsAtUtc, dto.EndsAtUtc, excludeId: id, cancellationToken);
@@ -160,7 +160,7 @@ public sealed class ReservationService : IReservationService
     private static void ValidateWindow(DateTime startsAtUtc, DateTime endsAtUtc)
     {
         if (endsAtUtc <= startsAtUtc)
-            throw new InvalidOperationException("EndsAtUtc must be greater than StartsAtUtc.");
+            throw new InvalidOperationException("La hora de fin debe ser posterior a la hora de inicio.");
     }
 
     private static void EnsureAllowedTransition(ReservationStatus current, ReservationStatus next)
@@ -178,7 +178,7 @@ public sealed class ReservationService : IReservationService
         };
 
         if (!allowed)
-            throw new InvalidOperationException($"Status transition from {current} to {next} is not allowed.");
+            throw new InvalidOperationException("No es posible cambiar la reserva a ese estado.");
     }
 
     private async Task EnsureNoOverlapAsync(
@@ -198,7 +198,8 @@ public sealed class ReservationService : IReservationService
             cancellationToken);
 
         if (overlap)
-            throw new InvalidOperationException("The reservation overlaps an existing Pending or Confirmed reservation for this common area.");
+            throw new InvalidOperationException(
+                "Ya hay otra reserva en ese horario para esta zona. Por favor elige otra fecha u hora.");
     }
 
     private async Task<CommonArea> EnsureRelationsAsync(
@@ -210,25 +211,28 @@ public sealed class ReservationService : IReservationService
     {
         var propertyExists = await _properties.Query().AnyAsync(p => p.Id == horizontalPropertyId, cancellationToken);
         if (!propertyExists)
-            throw new InvalidOperationException("Horizontal property was not found.");
+            throw new InvalidOperationException("No encontramos la propiedad horizontal.");
 
         var area = await _areas.Query().AsNoTracking().FirstOrDefaultAsync(a => a.Id == commonAreaId, cancellationToken)
-            ?? throw new InvalidOperationException("Common area was not found.");
+            ?? throw new InvalidOperationException("No encontramos la zona común seleccionada.");
 
         if (area.HorizontalPropertyId != horizontalPropertyId)
-            throw new InvalidOperationException("Common area must belong to the same horizontal property.");
+            throw new InvalidOperationException("La zona común no pertenece a esta propiedad.");
 
         var unit = await _units.Query().AsNoTracking().FirstOrDefaultAsync(u => u.Id == unitId, cancellationToken)
-            ?? throw new InvalidOperationException("Unit was not found.");
+            ?? throw new InvalidOperationException("No encontramos la unidad seleccionada.");
 
         if (unit.HorizontalPropertyId != horizontalPropertyId)
-            throw new InvalidOperationException("Unit must belong to the same horizontal property.");
+            throw new InvalidOperationException("La unidad no pertenece a esta propiedad.");
+
+        if (unit.UnitType is not (UnitType.Apartment or UnitType.House))
+            throw new InvalidOperationException("Solo puedes reservar desde un apartamento o una casa.");
 
         if (personId.HasValue)
         {
             var personExists = await _people.Query().AnyAsync(p => p.Id == personId.Value, cancellationToken);
             if (!personExists)
-                throw new InvalidOperationException("Person was not found.");
+                throw new InvalidOperationException("No encontramos la persona seleccionada.");
         }
 
         return area;

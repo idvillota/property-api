@@ -3,12 +3,15 @@ using Property.Application.Common.Interfaces;
 using Property.Application.Common.Models;
 using Property.Application.Features.People.UnitOccupancies;
 using Property.Domain.Entities;
+using Property.Domain.Enums;
 using Property.Infrastructure.Common;
 
 namespace Property.Infrastructure.Services;
 
 public sealed class UnitOccupancyService : IUnitOccupancyService
 {
+    private const int MaxOwnersPerUnit = 2;
+
     private readonly IRepository<UnitOccupancy> _occupancies;
     private readonly IRepository<Unit> _units;
     private readonly IRepository<Person> _people;
@@ -25,6 +28,12 @@ public sealed class UnitOccupancyService : IUnitOccupancyService
         _people = people;
         _unitOfWork = unitOfWork;
     }
+
+    private static bool IsHabitantRole(OccupancyRole role) =>
+        role is OccupancyRole.Tenant or OccupancyRole.Resident or OccupancyRole.AuthorizedOccupant;
+
+    private static bool IsDwelling(UnitType unitType) =>
+        unitType is UnitType.Apartment or UnitType.House;
 
     public Task<PagedResult<UnitOccupancyDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
         ListQueryHelpers.ToPagedResultAsync(
@@ -43,7 +52,14 @@ public sealed class UnitOccupancyService : IUnitOccupancyService
     public async Task<UnitOccupancyDto> CreateAsync(CreateUnitOccupancyDto dto, CancellationToken cancellationToken = default)
     {
         ValidateDates(dto.StartDate, dto.EndDate);
-        await EnsureUnitAndPersonAsync(dto.UnitId, dto.PersonId, cancellationToken);
+        var unit = await EnsureUnitAndPersonAsync(dto.UnitId, dto.PersonId, cancellationToken);
+        await ValidateOccupancyRulesAsync(
+            unit,
+            dto.PersonId,
+            dto.Role,
+            occupancyId: null,
+            isActive: true,
+            cancellationToken);
 
         var entity = new UnitOccupancy
         {
@@ -69,7 +85,14 @@ public sealed class UnitOccupancyService : IUnitOccupancyService
             return null;
 
         ValidateDates(dto.StartDate, dto.EndDate);
-        await EnsureUnitAndPersonAsync(dto.UnitId, dto.PersonId, cancellationToken);
+        var unit = await EnsureUnitAndPersonAsync(dto.UnitId, dto.PersonId, cancellationToken);
+        await ValidateOccupancyRulesAsync(
+            unit,
+            dto.PersonId,
+            dto.Role,
+            occupancyId: id,
+            isActive: dto.IsActive,
+            cancellationToken);
 
         entity.UnitId = dto.UnitId;
         entity.PersonId = dto.PersonId;
@@ -102,16 +125,69 @@ public sealed class UnitOccupancyService : IUnitOccupancyService
             throw new InvalidOperationException("EndDate must be greater than or equal to StartDate.");
     }
 
-    private async Task EnsureUnitAndPersonAsync(Guid unitId, Guid personId, CancellationToken cancellationToken)
+    private async Task<Unit> EnsureUnitAndPersonAsync(Guid unitId, Guid personId, CancellationToken cancellationToken)
     {
         var unit = await _units.Query().AsNoTracking().FirstOrDefaultAsync(u => u.Id == unitId, cancellationToken)
             ?? throw new InvalidOperationException("Unit was not found.");
+
+        if (unit.UnitType is not (UnitType.Apartment or UnitType.House))
+            throw new InvalidOperationException("Occupancies can only be linked to apartments or houses.");
 
         var person = await _people.Query().AsNoTracking().FirstOrDefaultAsync(p => p.Id == personId, cancellationToken)
             ?? throw new InvalidOperationException("Person was not found.");
 
         if (unit.TenantId != person.TenantId)
             throw new InvalidOperationException("Unit and Person must belong to the same tenant.");
+
+        return unit;
+    }
+
+    private async Task ValidateOccupancyRulesAsync(
+        Unit unit,
+        Guid personId,
+        OccupancyRole role,
+        Guid? occupancyId,
+        bool isActive,
+        CancellationToken cancellationToken)
+    {
+        if (!isActive)
+            return;
+
+        if (role == OccupancyRole.Owner)
+        {
+            var ownerCount = await _occupancies.Query().AsNoTracking()
+                .CountAsync(
+                    o => o.UnitId == unit.Id &&
+                         o.IsActive &&
+                         o.Role == OccupancyRole.Owner &&
+                         (!occupancyId.HasValue || o.Id != occupancyId.Value),
+                    cancellationToken);
+
+            if (ownerCount >= MaxOwnersPerUnit)
+                throw new InvalidOperationException(
+                    "Una unidad solo puede tener hasta 2 propietarios (por ejemplo, padre y madre).");
+        }
+
+        if (IsHabitantRole(role) && IsDwelling(unit.UnitType))
+        {
+            var otherDwellingHabitant = await (
+                from o in _occupancies.Query().AsNoTracking()
+                join u in _units.Query().AsNoTracking() on o.UnitId equals u.Id
+                where o.PersonId == personId &&
+                      o.IsActive &&
+                      (o.Role == OccupancyRole.Tenant ||
+                       o.Role == OccupancyRole.Resident ||
+                       o.Role == OccupancyRole.AuthorizedOccupant) &&
+                      (u.UnitType == UnitType.Apartment || u.UnitType == UnitType.House) &&
+                      u.Id != unit.Id &&
+                      (!occupancyId.HasValue || o.Id != occupancyId.Value)
+                select u.Code
+            ).FirstOrDefaultAsync(cancellationToken);
+
+            if (otherDwellingHabitant is not null)
+                throw new InvalidOperationException(
+                    $"Esta persona ya es habitante de la unidad {otherDwellingHabitant}. Un habitante solo puede vivir en un apartamento o casa.");
+        }
     }
 
     private static UnitOccupancyDto Map(UnitOccupancy entity) =>

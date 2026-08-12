@@ -13,6 +13,7 @@ public static class FeatureCodes
     public const string StructureBuildings = "structure.buildings";
     public const string StructureFloors = "structure.floors";
     public const string StructureUnits = "structure.units";
+    public const string StructureVehicleBrands = "structure.vehicleBrands";
     public const string PeopleManage = "people.manage";
     public const string BillingSettings = "billing.settings";
     public const string BillingCharges = "billing.charges";
@@ -35,6 +36,7 @@ public static class FeatureCodes
         StructureBuildings,
         StructureFloors,
         StructureUnits,
+        StructureVehicleBrands,
         PeopleManage,
         BillingSettings,
         BillingCharges,

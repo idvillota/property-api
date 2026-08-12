@@ -17,6 +17,7 @@ public sealed class UnitService : IUnitService
     private readonly IRepository<Floor> _floors;
     private readonly IRepository<UnitOccupancy> _occupancies;
     private readonly IRepository<Person> _people;
+    private readonly IRepository<Vehicle> _vehicles;
     private readonly IUnitOfWork _unitOfWork;
 
     public UnitService(
@@ -26,6 +27,7 @@ public sealed class UnitService : IUnitService
         IRepository<Floor> floors,
         IRepository<UnitOccupancy> occupancies,
         IRepository<Person> people,
+        IRepository<Vehicle> vehicles,
         IUnitOfWork unitOfWork)
     {
         _units = units;
@@ -34,6 +36,7 @@ public sealed class UnitService : IUnitService
         _floors = floors;
         _occupancies = occupancies;
         _people = people;
+        _vehicles = vehicles;
         _unitOfWork = unitOfWork;
     }
 
@@ -54,7 +57,18 @@ public sealed class UnitService : IUnitService
     public async Task<UnitDto> CreateAsync(CreateUnitDto dto, CancellationToken cancellationToken = default)
     {
         ValidateStructure(dto.BuildingId, dto.FloorId, dto.LinkedUnitId, unitId: null);
-        await EnsureReferencesAsync(dto.HorizontalPropertyId, dto.BuildingId, dto.FloorId, dto.LinkedUnitId, cancellationToken);
+        var linkedUnitId = NormalizeLinkedUnitId(dto.UnitType, dto.LinkedUnitId);
+        await EnsureReferencesAsync(
+            dto.HorizontalPropertyId,
+            dto.BuildingId,
+            dto.FloorId,
+            linkedUnitId,
+            cancellationToken);
+        await EnsureAmenityLinkRulesAsync(
+            dto.HorizontalPropertyId,
+            dto.UnitType,
+            linkedUnitId,
+            cancellationToken);
 
         var entity = new Unit
         {
@@ -68,8 +82,13 @@ public sealed class UnitService : IUnitService
             PrivateOpenAreaM2 = dto.PrivateOpenAreaM2,
             Coefficient = 0m,
             ContributionModuleCode = dto.ContributionModuleCode?.Trim(),
-            LinkedUnitId = dto.LinkedUnitId,
+            LinkedUnitId = linkedUnitId,
+            ParkingCount = dto.ParkingCount,
+            TerraceCount = dto.TerraceCount,
+            StorageCount = dto.StorageCount,
+            IsDoubleParking = dto.UnitType == UnitType.Parking && dto.IsDoubleParking,
             IsBillable = dto.IsBillable,
+            IsPaymentUpToDate = dto.IsPaymentUpToDate,
             IsActive = true,
         };
         await _units.AddAsync(entity, cancellationToken);
@@ -85,7 +104,18 @@ public sealed class UnitService : IUnitService
             return null;
 
         ValidateStructure(dto.BuildingId, dto.FloorId, dto.LinkedUnitId, unitId: id);
-        await EnsureReferencesAsync(dto.HorizontalPropertyId, dto.BuildingId, dto.FloorId, dto.LinkedUnitId, cancellationToken);
+        var linkedUnitId = NormalizeLinkedUnitId(dto.UnitType, dto.LinkedUnitId);
+        await EnsureReferencesAsync(
+            dto.HorizontalPropertyId,
+            dto.BuildingId,
+            dto.FloorId,
+            linkedUnitId,
+            cancellationToken);
+        await EnsureAmenityLinkRulesAsync(
+            dto.HorizontalPropertyId,
+            dto.UnitType,
+            linkedUnitId,
+            cancellationToken);
 
         entity.HorizontalPropertyId = dto.HorizontalPropertyId;
         entity.BuildingId = dto.BuildingId;
@@ -95,14 +125,37 @@ public sealed class UnitService : IUnitService
         entity.PrivateBuiltAreaM2 = dto.PrivateBuiltAreaM2;
         entity.PrivateOpenAreaM2 = dto.PrivateOpenAreaM2;
         entity.ContributionModuleCode = dto.ContributionModuleCode?.Trim();
-        entity.LinkedUnitId = dto.LinkedUnitId;
+        entity.LinkedUnitId = linkedUnitId;
+        entity.ParkingCount = dto.ParkingCount;
+        entity.TerraceCount = dto.TerraceCount;
+        entity.StorageCount = dto.StorageCount;
+        var isDoubleParking = dto.UnitType == UnitType.Parking && dto.IsDoubleParking;
+        if (dto.UnitType == UnitType.Parking)
+            await EnsureDoubleParkingChangeAllowedAsync(id, isDoubleParking, cancellationToken);
+        entity.IsDoubleParking = isDoubleParking;
         entity.IsBillable = dto.IsBillable;
+        entity.IsPaymentUpToDate = dto.IsPaymentUpToDate;
         entity.IsActive = dto.IsActive;
         _units.Update(entity);
 
         await RecalculateCoefficientsAsync(dto.HorizontalPropertyId, newlyAdded: null, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Map(entity);
+    }
+
+    private async Task EnsureDoubleParkingChangeAllowedAsync(
+        Guid parkingUnitId,
+        bool isDoubleParking,
+        CancellationToken cancellationToken)
+    {
+        if (isDoubleParking)
+            return;
+
+        var activeVehicles = await _vehicles.Query().AsNoTracking()
+            .CountAsync(v => v.IsActive && v.UnitId == parkingUnitId, cancellationToken);
+        if (activeVehicles > 1)
+            throw new InvalidOperationException(
+                "No se puede cambiar a parqueadero sencillo: tiene 2 vehículos asociados. Desvincula uno primero.");
     }
 
     public async Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default)
@@ -197,6 +250,40 @@ public sealed class UnitService : IUnitService
             throw new InvalidOperationException("LinkedUnitId cannot equal the unit itself.");
     }
 
+    private static bool IsAmenityUnit(UnitType unitType) =>
+        unitType is UnitType.Parking or UnitType.Terrace or UnitType.Storage;
+
+    private static bool IsDwellingUnit(UnitType unitType) =>
+        unitType is UnitType.Apartment or UnitType.House;
+
+    private static Guid? NormalizeLinkedUnitId(UnitType unitType, Guid? linkedUnitId) =>
+        IsAmenityUnit(unitType) ? linkedUnitId : null;
+
+    private async Task EnsureAmenityLinkRulesAsync(
+        Guid horizontalPropertyId,
+        UnitType unitType,
+        Guid? linkedUnitId,
+        CancellationToken cancellationToken)
+    {
+        if (!linkedUnitId.HasValue)
+            return;
+
+        if (!IsAmenityUnit(unitType))
+            throw new InvalidOperationException(
+                "Solo parqueaderos, terrazas y bodegas pueden vincularse a un apartamento o casa.");
+
+        var host = await _units.Query().AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == linkedUnitId.Value, cancellationToken)
+            ?? throw new InvalidOperationException("La unidad vinculada no existe.");
+
+        if (host.HorizontalPropertyId != horizontalPropertyId)
+            throw new InvalidOperationException("La unidad vinculada no pertenece a la misma propiedad.");
+
+        if (!IsDwellingUnit(host.UnitType))
+            throw new InvalidOperationException(
+                "Parqueaderos, terrazas y bodegas solo se pueden vincular a apartamentos o casas.");
+    }
+
     private async Task EnsureReferencesAsync(
         Guid horizontalPropertyId,
         Guid? buildingId,
@@ -271,6 +358,7 @@ public sealed class UnitService : IUnitService
         static UnitHouseholdPersonDto ToPerson(UnitOccupancy o, Person p) =>
             new()
             {
+                OccupancyId = o.Id,
                 PersonId = p.Id,
                 FullName = $"{p.FirstName} {p.LastName}".Trim(),
                 DocumentLabel = $"{p.DocumentType} {p.DocumentNumber}",
@@ -292,6 +380,27 @@ public sealed class UnitService : IUnitService
             .Select(r => ToPerson(r.Occupancy, r.Person))
             .ToList();
 
+        var relatedAmenities = await _units.Query().AsNoTracking()
+            .Where(u => u.LinkedUnitId == unitId && u.IsActive)
+            .OrderBy(u => u.Code)
+            .Select(u => new { u.Id, u.Code, u.UnitType })
+            .ToListAsync(cancellationToken);
+
+        var relatedParkings = relatedAmenities
+            .Where(u => u.UnitType == UnitType.Parking)
+            .Select(u => new UnitAmenityLinkDto { UnitId = u.Id, Code = u.Code })
+            .ToList();
+
+        var relatedTerraces = relatedAmenities
+            .Where(u => u.UnitType == UnitType.Terrace)
+            .Select(u => new UnitAmenityLinkDto { UnitId = u.Id, Code = u.Code })
+            .ToList();
+
+        var relatedStorages = relatedAmenities
+            .Where(u => u.UnitType == UnitType.Storage)
+            .Select(u => new UnitAmenityLinkDto { UnitId = u.Id, Code = u.Code })
+            .ToList();
+
         return new UnitHouseholdDto
         {
             UnitId = unit.Id,
@@ -303,8 +412,14 @@ public sealed class UnitService : IUnitService
             FloorName = floorName,
             PrivateBuiltAreaM2 = unit.PrivateBuiltAreaM2,
             Coefficient = unit.Coefficient,
+            ParkingCount = relatedParkings.Count,
+            TerraceCount = relatedTerraces.Count,
+            StorageCount = relatedStorages.Count,
             Owners = owners,
             Habitants = habitants,
+            RelatedParkings = relatedParkings,
+            RelatedTerraces = relatedTerraces,
+            RelatedStorages = relatedStorages,
         };
     }
 
@@ -322,7 +437,12 @@ public sealed class UnitService : IUnitService
             Coefficient = entity.Coefficient,
             ContributionModuleCode = entity.ContributionModuleCode,
             LinkedUnitId = entity.LinkedUnitId,
+            ParkingCount = entity.ParkingCount,
+            TerraceCount = entity.TerraceCount,
+            StorageCount = entity.StorageCount,
+            IsDoubleParking = entity.IsDoubleParking,
             IsBillable = entity.IsBillable,
+            IsPaymentUpToDate = entity.IsPaymentUpToDate,
             IsActive = entity.IsActive,
         };
 }

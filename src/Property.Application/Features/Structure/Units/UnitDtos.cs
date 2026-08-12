@@ -16,7 +16,12 @@ public sealed class UnitDto
     public decimal Coefficient { get; set; }
     public string? ContributionModuleCode { get; set; }
     public Guid? LinkedUnitId { get; set; }
+    public int ParkingCount { get; set; }
+    public int TerraceCount { get; set; }
+    public int StorageCount { get; set; }
+    public bool IsDoubleParking { get; set; }
     public bool IsBillable { get; set; }
+    public bool IsPaymentUpToDate { get; set; }
     public bool IsActive { get; set; }
 }
 
@@ -50,7 +55,20 @@ public sealed class CreateUnitDto
 
     public Guid? LinkedUnitId { get; set; }
 
+    [Range(0, 50)]
+    public int ParkingCount { get; set; }
+
+    [Range(0, 20)]
+    public int TerraceCount { get; set; }
+
+    [Range(0, 50)]
+    public int StorageCount { get; set; }
+
+    public bool IsDoubleParking { get; set; }
+
     public bool IsBillable { get; set; } = true;
+
+    public bool IsPaymentUpToDate { get; set; } = true;
 }
 
 public sealed class UpdateUnitDto
@@ -83,7 +101,20 @@ public sealed class UpdateUnitDto
 
     public Guid? LinkedUnitId { get; set; }
 
+    [Range(0, 50)]
+    public int ParkingCount { get; set; }
+
+    [Range(0, 20)]
+    public int TerraceCount { get; set; }
+
+    [Range(0, 50)]
+    public int StorageCount { get; set; }
+
+    public bool IsDoubleParking { get; set; }
+
     public bool IsBillable { get; set; } = true;
+
+    public bool IsPaymentUpToDate { get; set; } = true;
 
     public bool IsActive { get; set; } = true;
 }

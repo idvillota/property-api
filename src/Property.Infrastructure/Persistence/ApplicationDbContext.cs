@@ -29,6 +29,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<Building> Buildings => Set<Building>();
     public DbSet<Floor> Floors => Set<Floor>();
     public DbSet<Unit> Units => Set<Unit>();
+    public DbSet<VehicleBrand> VehicleBrands => Set<VehicleBrand>();
+    public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<Person> People => Set<Person>();
     public DbSet<UnitOccupancy> UnitOccupancies => Set<UnitOccupancy>();
     public DbSet<FeeSettings> FeeSettings => Set<FeeSettings>();
@@ -197,6 +199,32 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Code }).IsUnique();
         });
 
+        modelBuilder.Entity<VehicleBrand>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(80);
+            e.HasIndex(x => new { x.TenantId, x.Name });
+        });
+
+        modelBuilder.Entity<Vehicle>(e =>
+        {
+            e.Property(x => x.Brand).HasMaxLength(80);
+            e.Property(x => x.Model).HasMaxLength(80);
+            e.Property(x => x.Color).HasMaxLength(40);
+            e.Property(x => x.Plate).HasMaxLength(20);
+            e.HasOne(x => x.Unit)
+                .WithMany()
+                .HasForeignKey(x => x.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.VehicleBrand)
+                .WithMany()
+                .HasForeignKey(x => x.VehicleBrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.Plate });
+            e.HasIndex(x => x.UnitId);
+            e.HasIndex(x => x.VehicleBrandId);
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId });
+        });
+
         modelBuilder.Entity<Person>(e =>
         {
             e.Property(x => x.DocumentNumber).HasMaxLength(40);
@@ -352,6 +380,10 @@ public sealed class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.PersonId)
                 .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.DeliveredToPerson)
+                .WithMany()
+                .HasForeignKey(x => x.DeliveredToPersonId)
+                .OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.ReceivedByEmployee)
                 .WithMany()
                 .HasForeignKey(x => x.ReceivedByEmployeeId)
@@ -401,6 +433,12 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Unit>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<VehicleBrand>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<Vehicle>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Person>().HasQueryFilter(e =>

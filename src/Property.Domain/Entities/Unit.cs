@@ -16,7 +16,17 @@ public class Unit : EntityBase, ITenantScoped
     public decimal Coefficient { get; set; }
     public string? ContributionModuleCode { get; set; }
     public Guid? LinkedUnitId { get; set; }
+    /// <summary>Number of parking spaces assigned to this unit (0 = none).</summary>
+    public int ParkingCount { get; set; }
+    /// <summary>When unit is Parking: true = up to 2 vehicles, false = 1 vehicle.</summary>
+    public bool IsDoubleParking { get; set; }
+    /// <summary>Number of terraces (terrazas) assigned to this unit (0 = none).</summary>
+    public int TerraceCount { get; set; }
+    /// <summary>Number of storage units / bodegas assigned to this unit (0 = none).</summary>
+    public int StorageCount { get; set; }
     public bool IsBillable { get; set; } = true;
+    /// <summary>Whether the unit is up to date on payments (manual flag until cartera drives it).</summary>
+    public bool IsPaymentUpToDate { get; set; } = true;
     public bool IsActive { get; set; } = true;
 
     public HorizontalProperty? HorizontalProperty { get; set; }

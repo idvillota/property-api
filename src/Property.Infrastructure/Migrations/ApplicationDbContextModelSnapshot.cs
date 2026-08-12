@@ -681,6 +681,9 @@ namespace Property.Infrastructure.Migrations
                     b.Property<Guid?>("DeliveredByEmployeeId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("DeliveredToPersonId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("HorizontalPropertyId")
                         .HasColumnType("uuid");
 
@@ -726,6 +729,8 @@ namespace Property.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DeliveredByEmployeeId");
+
+                    b.HasIndex("DeliveredToPersonId");
 
                     b.HasIndex("HorizontalPropertyId");
 
@@ -1080,8 +1085,17 @@ namespace Property.Infrastructure.Migrations
                     b.Property<bool>("IsBillable")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsDoubleParking")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsPaymentUpToDate")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid?>("LinkedUnitId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("ParkingCount")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("PrivateBuiltAreaM2")
                         .HasPrecision(18, 2)
@@ -1091,8 +1105,14 @@ namespace Property.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<int>("StorageCount")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("TerraceCount")
+                        .HasColumnType("integer");
 
                     b.Property<int>("UnitType")
                         .HasColumnType("integer");
@@ -1201,6 +1221,99 @@ namespace Property.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.Vehicle", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Brand")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("HorizontalPropertyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Plate")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VehicleBrandId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("VehicleType")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("VehicleBrandId");
+
+                    b.HasIndex("TenantId", "HorizontalPropertyId");
+
+                    b.HasIndex("TenantId", "Plate");
+
+                    b.ToTable("Vehicles");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.VehicleBrand", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name");
+
+                    b.ToTable("VehicleBrands");
                 });
 
             modelBuilder.Entity("Property.Domain.Entities.BillingPeriod", b =>
@@ -1356,6 +1469,11 @@ namespace Property.Infrastructure.Migrations
                         .HasForeignKey("DeliveredByEmployeeId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Property.Domain.Entities.Person", "DeliveredToPerson")
+                        .WithMany()
+                        .HasForeignKey("DeliveredToPersonId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Property.Domain.Entities.HorizontalProperty", "HorizontalProperty")
                         .WithMany()
                         .HasForeignKey("HorizontalPropertyId")
@@ -1378,6 +1496,8 @@ namespace Property.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("DeliveredByEmployee");
+
+                    b.Navigation("DeliveredToPerson");
 
                     b.Navigation("HorizontalProperty");
 
@@ -1550,6 +1670,24 @@ namespace Property.Infrastructure.Migrations
                     b.Navigation("Person");
 
                     b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.Vehicle", b =>
+                {
+                    b.HasOne("Property.Domain.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Property.Domain.Entities.VehicleBrand", "VehicleBrand")
+                        .WithMany()
+                        .HasForeignKey("VehicleBrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Unit");
+
+                    b.Navigation("VehicleBrand");
                 });
 
             modelBuilder.Entity("Property.Domain.Entities.BillingPeriod", b =>

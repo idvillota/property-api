@@ -40,8 +40,11 @@ public static class DependencyInjection
         services.AddScoped<INeighborhoodService, NeighborhoodService>();
         services.AddScoped<IHorizontalPropertyService, HorizontalPropertyService>();
         services.AddScoped<IBuildingService, BuildingService>();
+        services.AddScoped<IVehicleService, VehicleService>();
+        services.AddScoped<IVehicleBrandService, VehicleBrandService>();
         services.AddScoped<IFloorService, FloorService>();
         services.AddScoped<IUnitService, UnitService>();
+        services.AddScoped<IStructureComposerService, StructureComposerService>();
         services.AddScoped<IPersonService, PersonService>();
         services.AddScoped<IUnitOccupancyService, UnitOccupancyService>();
         services.AddScoped<IFeeSettingsService, FeeSettingsService>();

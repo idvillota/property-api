@@ -19,6 +19,7 @@ public static class FeatureCatalog
         new(Guid.Parse("f1000024-002a-402a-802a-000000000024"), FeatureCodes.StructureBuildings, "Buildings", "Structure", 230),
         new(Guid.Parse("f1000025-002b-402b-802b-000000000025"), FeatureCodes.StructureFloors, "Floors", "Structure", 240),
         new(Guid.Parse("f1000026-002c-402c-802c-000000000026"), FeatureCodes.StructureUnits, "Units", "Structure", 250),
+        new(Guid.Parse("f100002f-0035-4035-8035-00000000002f"), FeatureCodes.StructureVehicleBrands, "Vehicle brands", "Structure", 255),
         new(Guid.Parse("f1000027-002d-402d-802d-000000000027"), FeatureCodes.PeopleManage, "People and occupancies", "People", 310),
         new(Guid.Parse("f1000028-002e-402e-802e-000000000028"), FeatureCodes.BillingSettings, "Fee settings", "Billing", 410),
         new(Guid.Parse("f1000029-002f-402f-802f-000000000029"), FeatureCodes.BillingCharges, "Billing periods and charges", "Billing", 420),

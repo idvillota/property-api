@@ -48,6 +48,7 @@ public sealed class FeatureAuthorizationTests
     [InlineData(typeof(NeighborhoodsController), FeatureCodes.StructureNeighborhoods)]
     [InlineData(typeof(HorizontalPropertiesController), FeatureCodes.StructureProperties)]
     [InlineData(typeof(BuildingsController), FeatureCodes.StructureBuildings)]
+    [InlineData(typeof(StructureComposerController), FeatureCodes.StructureBuildings)]
     [InlineData(typeof(FloorsController), FeatureCodes.StructureFloors)]
     [InlineData(typeof(UnitsController), FeatureCodes.StructureUnits)]
     [InlineData(typeof(PeopleController), FeatureCodes.PeopleManage)]

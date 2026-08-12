@@ -14,6 +14,7 @@ public sealed class ReceptionItemService : IReceptionItemService
     private readonly IRepository<HorizontalProperty> _properties;
     private readonly IRepository<Unit> _units;
     private readonly IRepository<Person> _people;
+    private readonly IRepository<UnitOccupancy> _occupancies;
     private readonly IRepository<Employee> _employees;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -22,6 +23,7 @@ public sealed class ReceptionItemService : IReceptionItemService
         IRepository<HorizontalProperty> properties,
         IRepository<Unit> units,
         IRepository<Person> people,
+        IRepository<UnitOccupancy> occupancies,
         IRepository<Employee> employees,
         IUnitOfWork unitOfWork)
     {
@@ -29,6 +31,7 @@ public sealed class ReceptionItemService : IReceptionItemService
         _properties = properties;
         _units = units;
         _people = people;
+        _occupancies = occupancies;
         _employees = employees;
         _unitOfWork = unitOfWork;
     }
@@ -38,24 +41,29 @@ public sealed class ReceptionItemService : IReceptionItemService
             _items.Query().AsNoTracking(),
             query,
             q => PagedEntityQueries.ShapeReceptionItems(q, query),
-            entities => Task.FromResult<IReadOnlyList<ReceptionItemDto>>(entities.Select(Map).ToList()),
+            entities => EnrichAsync(entities, cancellationToken),
             cancellationToken);
 
     public async Task<ReceptionItemDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var entity = await _items.Query().AsNoTracking().FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
-        return entity is null ? null : Map(entity);
+        if (entity is null)
+            return null;
+
+        var list = await EnrichAsync([entity], cancellationToken);
+        return list[0];
     }
 
     public async Task<ReceptionItemDto> CreateAsync(CreateReceptionItemDto dto, CancellationToken cancellationToken = default)
     {
-        await EnsureRelationsAsync(
-            dto.HorizontalPropertyId,
-            dto.UnitId,
-            dto.PersonId,
-            dto.ReceivedByEmployeeId,
-            deliveredByEmployeeId: null,
-            cancellationToken);
+        await EnsurePropertyAsync(dto.HorizontalPropertyId, cancellationToken);
+        await EnsureDwellingUnitAsync(dto.HorizontalPropertyId, dto.UnitId, cancellationToken);
+        var recipient = await EnsureUnitHabitantAsync(dto.UnitId, dto.PersonId, cancellationToken);
+
+        if (dto.ReceivedByEmployeeId.HasValue)
+            await EnsureEmployeeAsync(dto.ReceivedByEmployeeId.Value, cancellationToken);
+
+        EnsureNotBeforeToday(dto.ReceivedAtUtc, "La fecha de recepción");
 
         var entity = new ReceptionItem
         {
@@ -69,13 +77,14 @@ public sealed class ReceptionItemService : IReceptionItemService
             ReceivedByEmployeeId = dto.ReceivedByEmployeeId,
             CarrierOrSender = dto.CarrierOrSender?.Trim(),
             TrackingOrReference = dto.TrackingOrReference?.Trim(),
-            RecipientName = dto.RecipientName?.Trim(),
+            RecipientName = PersonDisplayName(recipient),
             Notes = dto.Notes?.Trim(),
             IsActive = true,
         };
         await _items.AddAsync(entity, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return Map(entity);
+        var list = await EnrichAsync([entity], cancellationToken);
+        return list[0];
     }
 
     public async Task<ReceptionItemDto?> UpdateAsync(
@@ -87,13 +96,27 @@ public sealed class ReceptionItemService : IReceptionItemService
         if (entity is null)
             return null;
 
-        await EnsureRelationsAsync(
-            dto.HorizontalPropertyId,
-            dto.UnitId,
-            dto.PersonId,
-            dto.ReceivedByEmployeeId,
-            dto.DeliveredByEmployeeId,
-            cancellationToken);
+        await EnsurePropertyAsync(dto.HorizontalPropertyId, cancellationToken);
+        await EnsureDwellingUnitAsync(dto.HorizontalPropertyId, dto.UnitId, cancellationToken);
+        var recipient = await EnsureUnitHabitantAsync(dto.UnitId, dto.PersonId, cancellationToken);
+
+        if (dto.ReceivedByEmployeeId.HasValue)
+            await EnsureEmployeeAsync(dto.ReceivedByEmployeeId.Value, cancellationToken);
+
+        if (dto.DeliveredByEmployeeId.HasValue)
+            await EnsureEmployeeAsync(dto.DeliveredByEmployeeId.Value, cancellationToken);
+
+        if (dto.DeliveredToPersonId.HasValue)
+            await EnsureUnitHabitantAsync(dto.UnitId, dto.DeliveredToPersonId.Value, cancellationToken);
+
+        if (dto.ReceivedAtUtc != entity.ReceivedAtUtc)
+            EnsureNotBeforeToday(dto.ReceivedAtUtc, "La fecha de recepción");
+
+        if (dto.DeliveredAtUtc.HasValue && dto.DeliveredAtUtc != entity.DeliveredAtUtc)
+            EnsureNotBeforeToday(dto.DeliveredAtUtc.Value, "La fecha de entrega");
+
+        if (dto.DeliveredAtUtc.HasValue && dto.DeliveredAtUtc.Value < dto.ReceivedAtUtc)
+            throw new InvalidOperationException("La fecha de entrega no puede ser anterior a la recepción.");
 
         entity.HorizontalPropertyId = dto.HorizontalPropertyId;
         entity.UnitId = dto.UnitId;
@@ -104,14 +127,16 @@ public sealed class ReceptionItemService : IReceptionItemService
         entity.ReceivedByEmployeeId = dto.ReceivedByEmployeeId;
         entity.DeliveredAtUtc = dto.DeliveredAtUtc;
         entity.DeliveredByEmployeeId = dto.DeliveredByEmployeeId;
+        entity.DeliveredToPersonId = dto.DeliveredToPersonId;
         entity.CarrierOrSender = dto.CarrierOrSender?.Trim();
         entity.TrackingOrReference = dto.TrackingOrReference?.Trim();
-        entity.RecipientName = dto.RecipientName?.Trim();
+        entity.RecipientName = PersonDisplayName(recipient);
         entity.Notes = dto.Notes?.Trim();
         entity.IsActive = dto.IsActive;
         _items.Update(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return Map(entity);
+        var list = await EnrichAsync([entity], cancellationToken);
+        return list[0];
     }
 
     public async Task<ReceptionItemDto?> DeliverAsync(
@@ -124,20 +149,32 @@ public sealed class ReceptionItemService : IReceptionItemService
             return null;
 
         if (entity.Status is ReceptionItemStatus.Delivered or ReceptionItemStatus.Returned or ReceptionItemStatus.Cancelled)
-            throw new InvalidOperationException($"Cannot deliver a reception item with status {entity.Status}.");
+            throw new InvalidOperationException("Este ítem ya no se puede marcar como entregado.");
+
+        if (!entity.UnitId.HasValue)
+            throw new InvalidOperationException("Asocia una unidad al ítem antes de entregarlo.");
+
+        await EnsureUnitHabitantAsync(entity.UnitId.Value, dto.DeliveredToPersonId, cancellationToken);
 
         if (dto.DeliveredByEmployeeId.HasValue)
             await EnsureEmployeeAsync(dto.DeliveredByEmployeeId.Value, cancellationToken);
 
+        var deliveredAtUtc = DateTime.UtcNow;
+        EnsureNotBeforeToday(deliveredAtUtc, "La fecha de entrega");
+        if (deliveredAtUtc < entity.ReceivedAtUtc)
+            throw new InvalidOperationException("La fecha de entrega no puede ser anterior a la recepción.");
+
         entity.Status = ReceptionItemStatus.Delivered;
-        entity.DeliveredAtUtc = DateTime.UtcNow;
+        entity.DeliveredAtUtc = deliveredAtUtc;
+        entity.DeliveredToPersonId = dto.DeliveredToPersonId;
         entity.DeliveredByEmployeeId = dto.DeliveredByEmployeeId;
         if (dto.Notes is not null)
             entity.Notes = dto.Notes.Trim();
 
         _items.Update(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return Map(entity);
+        var list = await EnrichAsync([entity], cancellationToken);
+        return list[0];
     }
 
     public async Task<ReceptionItemDto?> ReturnAsync(Guid id, CancellationToken cancellationToken = default)
@@ -147,12 +184,13 @@ public sealed class ReceptionItemService : IReceptionItemService
             return null;
 
         if (entity.Status is ReceptionItemStatus.Returned or ReceptionItemStatus.Cancelled)
-            throw new InvalidOperationException($"Cannot return a reception item with status {entity.Status}.");
+            throw new InvalidOperationException("Este ítem ya no se puede marcar como devuelto.");
 
         entity.Status = ReceptionItemStatus.Returned;
         _items.Update(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return Map(entity);
+        var list = await EnrichAsync([entity], cancellationToken);
+        return list[0];
     }
 
     public async Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default)
@@ -171,9 +209,7 @@ public sealed class ReceptionItemService : IReceptionItemService
         Guid horizontalPropertyId,
         CancellationToken cancellationToken = default)
     {
-        var propertyExists = await _properties.Query().AnyAsync(p => p.Id == horizontalPropertyId, cancellationToken);
-        if (!propertyExists)
-            throw new InvalidOperationException("Horizontal property was not found.");
+        await EnsurePropertyAsync(horizontalPropertyId, cancellationToken);
 
         var count = await _items.Query().AsNoTracking().CountAsync(
             e => e.IsActive
@@ -184,49 +220,106 @@ public sealed class ReceptionItemService : IReceptionItemService
         return new ReceptionPendingCountDto { PendingPickupCount = count };
     }
 
-    private async Task EnsureRelationsAsync(
-        Guid horizontalPropertyId,
-        Guid? unitId,
-        Guid? personId,
-        Guid? receivedByEmployeeId,
-        Guid? deliveredByEmployeeId,
-        CancellationToken cancellationToken)
+    private async Task EnsurePropertyAsync(Guid horizontalPropertyId, CancellationToken cancellationToken)
     {
         var propertyExists = await _properties.Query().AnyAsync(p => p.Id == horizontalPropertyId, cancellationToken);
         if (!propertyExists)
-            throw new InvalidOperationException("Horizontal property was not found.");
+            throw new InvalidOperationException("No encontramos la propiedad horizontal.");
+    }
 
-        if (unitId.HasValue)
-        {
-            var unit = await _units.Query().AsNoTracking().FirstOrDefaultAsync(u => u.Id == unitId.Value, cancellationToken)
-                ?? throw new InvalidOperationException("Unit was not found.");
+    /// <summary>
+    /// Rejects moments clearly before "today", with 1 UTC-day slack for local timezones west of UTC.
+    /// </summary>
+    private static void EnsureNotBeforeToday(DateTime utcMoment, string fieldLabel)
+    {
+        var utc = utcMoment.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(utcMoment, DateTimeKind.Utc)
+            : utcMoment.ToUniversalTime();
 
-            if (unit.HorizontalPropertyId != horizontalPropertyId)
-                throw new InvalidOperationException("Unit must belong to the same horizontal property.");
-        }
+        var minAllowed = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+        if (DateOnly.FromDateTime(utc) < minAllowed)
+            throw new InvalidOperationException($"{fieldLabel} no puede ser anterior a hoy.");
+    }
 
-        if (personId.HasValue)
-        {
-            var personExists = await _people.Query().AnyAsync(p => p.Id == personId.Value, cancellationToken);
-            if (!personExists)
-                throw new InvalidOperationException("Person was not found.");
-        }
+    private async Task EnsureDwellingUnitAsync(
+        Guid horizontalPropertyId,
+        Guid unitId,
+        CancellationToken cancellationToken)
+    {
+        var unit = await _units.Query().AsNoTracking().FirstOrDefaultAsync(u => u.Id == unitId, cancellationToken)
+            ?? throw new InvalidOperationException("No encontramos la unidad seleccionada.");
 
-        if (receivedByEmployeeId.HasValue)
-            await EnsureEmployeeAsync(receivedByEmployeeId.Value, cancellationToken);
+        if (unit.HorizontalPropertyId != horizontalPropertyId)
+            throw new InvalidOperationException("La unidad no pertenece a esta propiedad.");
 
-        if (deliveredByEmployeeId.HasValue)
-            await EnsureEmployeeAsync(deliveredByEmployeeId.Value, cancellationToken);
+        if (unit.UnitType is not (UnitType.Apartment or UnitType.House))
+            throw new InvalidOperationException("Solo puedes registrar portería para apartamentos o casas.");
+    }
+
+    private async Task<Person> EnsureUnitHabitantAsync(
+        Guid unitId,
+        Guid personId,
+        CancellationToken cancellationToken)
+    {
+        var person = await _people.Query().AsNoTracking().FirstOrDefaultAsync(p => p.Id == personId, cancellationToken)
+            ?? throw new InvalidOperationException("No encontramos la persona seleccionada.");
+
+        var isHabitant = await _occupancies.Query().AsNoTracking().AnyAsync(
+            o => o.IsActive && o.UnitId == unitId && o.PersonId == personId,
+            cancellationToken);
+
+        if (!isHabitant)
+            throw new InvalidOperationException(
+                "La persona debe ser un habitante activo de la unidad.");
+
+        return person;
     }
 
     private async Task EnsureEmployeeAsync(Guid employeeId, CancellationToken cancellationToken)
     {
         var exists = await _employees.Query().AnyAsync(e => e.Id == employeeId, cancellationToken);
         if (!exists)
-            throw new InvalidOperationException("Employee was not found.");
+            throw new InvalidOperationException("No encontramos el empleado seleccionado.");
     }
 
-    private static ReceptionItemDto Map(ReceptionItem entity) =>
+    private async Task<IReadOnlyList<ReceptionItemDto>> EnrichAsync(
+        IEnumerable<ReceptionItem> entities,
+        CancellationToken cancellationToken)
+    {
+        var list = entities as IReadOnlyList<ReceptionItem> ?? entities.ToList();
+        if (list.Count == 0)
+            return [];
+
+        var unitIds = list.Where(e => e.UnitId.HasValue).Select(e => e.UnitId!.Value).Distinct().ToList();
+        var personIds = list
+            .SelectMany(e => new Guid?[] { e.PersonId, e.DeliveredToPersonId })
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+
+        var units = unitIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _units.Query().AsNoTracking()
+                .Where(u => unitIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => u.Code, cancellationToken);
+
+        var people = personIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _people.Query().AsNoTracking()
+                .Where(p => personIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, PersonDisplayName, cancellationToken);
+
+        return list.Select(e => Map(e, units, people)).ToList();
+    }
+
+    private static string PersonDisplayName(Person person) =>
+        $"{person.FirstName} {person.LastName}".Trim();
+
+    private static ReceptionItemDto Map(
+        ReceptionItem entity,
+        IReadOnlyDictionary<Guid, string> units,
+        IReadOnlyDictionary<Guid, string> people) =>
         new()
         {
             Id = entity.Id,
@@ -239,10 +332,19 @@ public sealed class ReceptionItemService : IReceptionItemService
             ReceivedByEmployeeId = entity.ReceivedByEmployeeId,
             DeliveredAtUtc = entity.DeliveredAtUtc,
             DeliveredByEmployeeId = entity.DeliveredByEmployeeId,
+            DeliveredToPersonId = entity.DeliveredToPersonId,
             CarrierOrSender = entity.CarrierOrSender,
             TrackingOrReference = entity.TrackingOrReference,
             RecipientName = entity.RecipientName,
             Notes = entity.Notes,
             IsActive = entity.IsActive,
+            UnitCode = entity.UnitId is { } unitId && units.TryGetValue(unitId, out var code) ? code : null,
+            PersonName = entity.PersonId is { } personId && people.TryGetValue(personId, out var name)
+                ? name
+                : entity.RecipientName,
+            DeliveredToPersonName = entity.DeliveredToPersonId is { } deliveredToId
+                && people.TryGetValue(deliveredToId, out var deliveredName)
+                ? deliveredName
+                : null,
         };
 }

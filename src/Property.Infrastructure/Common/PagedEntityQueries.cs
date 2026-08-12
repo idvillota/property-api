@@ -74,6 +74,30 @@ internal static class PagedEntityQueries
         };
     }
 
+    public static IQueryable<VehicleBrand> ShapeVehicleBrands(IQueryable<VehicleBrand> query, ListQuery q)
+    {
+        if (!q.IncludeInactive)
+            query = query.Where(e => e.IsActive);
+
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+            query = query.Where(e => EF.Functions.ILike(e.Name, EfTextSearch.LikePattern(search)));
+
+        if (q.FilterValue("name") is { } nameFilter)
+            query = query.Where(e => EF.Functions.ILike(e.Name, EfTextSearch.LikePattern(nameFilter)));
+
+        if (q.FilterValue("isActive") is { } activeRaw &&
+            ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
+            query = query.Where(e => e.IsActive == isActive);
+
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "name") switch
+        {
+            "isactive" => desc ? query.OrderByDescending(e => e.IsActive) : query.OrderBy(e => e.IsActive),
+            _ => desc ? query.OrderByDescending(e => e.Name) : query.OrderBy(e => e.Name),
+        };
+    }
+
     public static IQueryable<HorizontalProperty> ShapeHorizontalProperties(IQueryable<HorizontalProperty> query, ListQuery q)
     {
         if (!q.IncludeInactive)
@@ -234,7 +258,7 @@ internal static class PagedEntityQueries
         };
     }
 
-    public static IQueryable<Person> ShapePeople(IQueryable<Person> query, ListQuery q)
+    public static IQueryable<Vehicle> ShapeVehicles(IQueryable<Vehicle> query, ListQuery q)
     {
         if (!q.IncludeInactive)
             query = query.Where(e => e.IsActive);
@@ -243,10 +267,69 @@ internal static class PagedEntityQueries
         if (search.Length > 0)
         {
             query = query.Where(e =>
-                EF.Functions.ILike(e.FirstName, EfTextSearch.LikePattern(search)) ||
-                EF.Functions.ILike(e.LastName, EfTextSearch.LikePattern(search)) ||
-                EF.Functions.ILike(e.DocumentNumber, EfTextSearch.LikePattern(search)) ||
-                (e.Email != null && EF.Functions.ILike(e.Email, EfTextSearch.LikePattern(search))));
+                EF.Functions.ILike(e.Plate, EfTextSearch.LikePattern(search)) ||
+                EF.Functions.ILike(e.Brand, EfTextSearch.LikePattern(search)) ||
+                EF.Functions.ILike(e.Model, EfTextSearch.LikePattern(search)) ||
+                EF.Functions.ILike(e.Color, EfTextSearch.LikePattern(search)));
+        }
+
+        if (q.FilterValue("horizontalPropertyId") is { } hpRaw &&
+            ListQueryHelpers.TryParseGuid(hpRaw, out var horizontalPropertyId))
+            query = query.Where(e => e.HorizontalPropertyId == horizontalPropertyId);
+
+        if (q.FilterValue("unitId") is { } unitRaw)
+        {
+            if (string.Equals(unitRaw, "none", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(unitRaw, "unassigned", StringComparison.OrdinalIgnoreCase))
+                query = query.Where(e => e.UnitId == null);
+            else if (ListQueryHelpers.TryParseGuid(unitRaw, out var unitId))
+                query = query.Where(e => e.UnitId == unitId);
+        }
+
+        if (q.FilterValue("excludeUnitId") is { } excludeUnitRaw &&
+            ListQueryHelpers.TryParseGuid(excludeUnitRaw, out var excludeUnitId))
+            query = query.Where(e => e.UnitId != excludeUnitId);
+
+        if (q.FilterValue("vehicleType") is { } typeRaw &&
+            Enum.TryParse<VehicleType>(typeRaw, ignoreCase: true, out var vehicleType))
+            query = query.Where(e => e.VehicleType == vehicleType);
+
+        if (q.FilterValue("isActive") is { } activeRaw &&
+            ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
+            query = query.Where(e => e.IsActive == isActive);
+
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "plate") switch
+        {
+            "brand" => desc ? query.OrderByDescending(e => e.Brand) : query.OrderBy(e => e.Brand),
+            "model" => desc ? query.OrderByDescending(e => e.Model) : query.OrderBy(e => e.Model),
+            "vehicletype" => desc
+                ? query.OrderByDescending(e => e.VehicleType)
+                : query.OrderBy(e => e.VehicleType),
+            "isactive" => desc ? query.OrderByDescending(e => e.IsActive) : query.OrderBy(e => e.IsActive),
+            _ => desc ? query.OrderByDescending(e => e.Plate) : query.OrderBy(e => e.Plate),
+        };
+    }
+
+    public static IQueryable<Person> ShapePeople(IQueryable<Person> query, ListQuery q)
+    {
+        if (!q.IncludeInactive)
+            query = query.Where(e => e.IsActive);
+
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+        {
+            // Match each token against name/document/email so "Ana Pérez" works.
+            foreach (var term in search.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var pattern = EfTextSearch.LikePattern(term);
+                query = query.Where(e =>
+                    EF.Functions.ILike(e.FirstName, pattern) ||
+                    EF.Functions.ILike(e.LastName, pattern) ||
+                    EF.Functions.ILike(e.FirstName + " " + e.LastName, pattern) ||
+                    EF.Functions.ILike(e.DocumentNumber, pattern) ||
+                    (e.Email != null && EF.Functions.ILike(e.Email, pattern)));
+            }
         }
 
         if (q.FilterValue("documentType") is { } docTypeRaw &&
