@@ -89,10 +89,11 @@ public sealed class ReceptionItemsController : ControllerBase
     [HttpPost("{id:guid}/deliver")]
     public async Task<ActionResult<ReceptionItemDto>> Deliver(
         Guid id,
-        [FromBody] DeliverReceptionItemDto? dto,
+        [FromBody] DeliverReceptionItemDto dto,
         CancellationToken cancellationToken = default)
     {
-        dto ??= new DeliverReceptionItemDto();
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
 
         try
         {
