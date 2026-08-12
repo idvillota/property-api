@@ -13,6 +13,7 @@ public sealed class UnitHouseholdPersonDto
     public OccupancyRole Role { get; set; }
     public bool IsPrimary { get; set; }
     public bool ReceivesBilling { get; set; }
+    public bool IsCommunicationResponsible { get; set; }
 }
 
 public sealed class UnitAmenityLinkDto

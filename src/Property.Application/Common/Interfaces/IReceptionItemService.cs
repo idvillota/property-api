@@ -13,4 +13,7 @@ public interface IReceptionItemService
     Task<ReceptionItemDto?> ReturnAsync(Guid id, CancellationToken cancellationToken = default);
     Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ReceptionPendingCountDto> GetPendingCountAsync(Guid horizontalPropertyId, CancellationToken cancellationToken = default);
+    Task<BulkUtilityBillsResultDto> CreateBulkUtilityBillsAsync(
+        BulkUtilityBillsDto dto,
+        CancellationToken cancellationToken = default);
 }

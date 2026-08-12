@@ -83,135 +83,144 @@ public sealed class PaymentService : IPaymentService
         if (chargeIds.Count != dto.Allocations.Count)
             throw new InvalidOperationException("Duplicate fee charge allocations are not allowed.");
 
-        var charges = await _charges.Query()
-            .Where(c => chargeIds.Contains(c.Id))
-            .ToListAsync(cancellationToken);
-        if (charges.Count != chargeIds.Count)
-            throw new InvalidOperationException("One or more fee charges were not found.");
-
-        foreach (var charge in charges)
+        // Retry strategy requires the whole user transaction to run as one retriable unit.
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            if (!charge.IsActive)
-                throw new InvalidOperationException("Inactive fee charges cannot receive payments.");
-            if (charge.HorizontalPropertyId != dto.HorizontalPropertyId || charge.UnitId != dto.UnitId)
-                throw new InvalidOperationException("Fee charges must belong to the same unit and horizontal property.");
-            if (charge.Status is FeeChargeStatus.Waived or FeeChargeStatus.Cancelled or FeeChargeStatus.Paid)
-                throw new InvalidOperationException("Fee charge is not open for payment.");
-        }
+            var charges = await _charges.Query()
+                .Where(c => chargeIds.Contains(c.Id))
+                .ToListAsync(cancellationToken);
+            if (charges.Count != chargeIds.Count)
+                throw new InvalidOperationException("One or more fee charges were not found.");
 
-        await using var transaction = _db.Database.IsRelational()
-            ? await _db.Database.BeginTransactionAsync(cancellationToken)
-            : null;
-        try
-        {
-            var payment = new Payment
+            foreach (var charge in charges)
             {
-                Id = Guid.NewGuid(),
-                HorizontalPropertyId = dto.HorizontalPropertyId,
-                UnitId = dto.UnitId,
-                PersonId = dto.PersonId,
-                Amount = amount,
-                PaidAt = dto.PaidAt.Kind == DateTimeKind.Unspecified
-                    ? DateTime.SpecifyKind(dto.PaidAt, DateTimeKind.Utc)
-                    : dto.PaidAt.ToUniversalTime(),
-                Method = dto.Method,
-                Reference = dto.Reference?.Trim(),
-                Notes = dto.Notes?.Trim(),
-                IsActive = true,
-            };
-
-            var chargesById = charges.ToDictionary(c => c.Id);
-            foreach (var allocationDto in dto.Allocations)
-            {
-                var charge = chargesById[allocationDto.FeeChargeId];
-                var allocationAmount = Math.Round(allocationDto.Amount, 2, MidpointRounding.AwayFromZero);
-                var remaining = charge.Amount - charge.AmountPaid;
-                if (allocationAmount > remaining)
-                    throw new InvalidOperationException("Allocation exceeds the remaining balance of a fee charge.");
-
-                charge.AmountPaid = Math.Round(charge.AmountPaid + allocationAmount, 2, MidpointRounding.AwayFromZero);
-                charge.Status = charge.AmountPaid >= charge.Amount
-                    ? FeeChargeStatus.Paid
-                    : FeeChargeStatus.Partial;
-                _charges.Update(charge);
-
-                payment.Allocations.Add(new PaymentAllocation
-                {
-                    Id = Guid.NewGuid(),
-                    FeeChargeId = charge.Id,
-                    Amount = allocationAmount,
-                });
+                if (!charge.IsActive)
+                    throw new InvalidOperationException("Inactive fee charges cannot receive payments.");
+                if (charge.HorizontalPropertyId != dto.HorizontalPropertyId || charge.UnitId != dto.UnitId)
+                    throw new InvalidOperationException("Fee charges must belong to the same unit and horizontal property.");
+                if (charge.Status is FeeChargeStatus.Waived or FeeChargeStatus.Cancelled or FeeChargeStatus.Paid)
+                    throw new InvalidOperationException("Fee charge is not open for payment.");
             }
 
-            await _payments.AddAsync(payment, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            if (transaction is not null)
-                await transaction.CommitAsync(cancellationToken);
+            await using var transaction = _db.Database.IsRelational()
+                ? await _db.Database.BeginTransactionAsync(cancellationToken)
+                : null;
+            try
+            {
+                var payment = new Payment
+                {
+                    Id = Guid.NewGuid(),
+                    HorizontalPropertyId = dto.HorizontalPropertyId,
+                    UnitId = dto.UnitId,
+                    PersonId = dto.PersonId,
+                    Amount = amount,
+                    PaidAt = dto.PaidAt.Kind == DateTimeKind.Unspecified
+                        ? DateTime.SpecifyKind(dto.PaidAt, DateTimeKind.Utc)
+                        : dto.PaidAt.ToUniversalTime(),
+                    Method = dto.Method,
+                    Reference = dto.Reference?.Trim(),
+                    Notes = dto.Notes?.Trim(),
+                    IsActive = true,
+                };
 
-            return Map(payment);
-        }
-        catch
-        {
-            if (transaction is not null)
-                await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+                var chargesById = charges.ToDictionary(c => c.Id);
+                foreach (var allocationDto in dto.Allocations)
+                {
+                    var charge = chargesById[allocationDto.FeeChargeId];
+                    var allocationAmount = Math.Round(allocationDto.Amount, 2, MidpointRounding.AwayFromZero);
+                    var remaining = charge.Amount - charge.AmountPaid;
+                    if (allocationAmount > remaining)
+                        throw new InvalidOperationException("Allocation exceeds the remaining balance of a fee charge.");
+
+                    charge.AmountPaid = Math.Round(charge.AmountPaid + allocationAmount, 2, MidpointRounding.AwayFromZero);
+                    charge.Status = charge.AmountPaid >= charge.Amount
+                        ? FeeChargeStatus.Paid
+                        : FeeChargeStatus.Partial;
+                    _charges.Update(charge);
+
+                    payment.Allocations.Add(new PaymentAllocation
+                    {
+                        Id = Guid.NewGuid(),
+                        FeeChargeId = charge.Id,
+                        Amount = allocationAmount,
+                    });
+                }
+
+                await _payments.AddAsync(payment, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                if (transaction is not null)
+                    await transaction.CommitAsync(cancellationToken);
+
+                return Map(payment);
+            }
+            catch
+            {
+                if (transaction is not null)
+                    await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 
     public async Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var payment = await _payments.Query()
-            .Include(p => p.Allocations)
-            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
-        if (payment is null || !payment.IsActive)
-            return false;
-
-        await using var transaction = _db.Database.IsRelational()
-            ? await _db.Database.BeginTransactionAsync(cancellationToken)
-            : null;
-        try
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var chargeIds = payment.Allocations.Select(a => a.FeeChargeId).Distinct().ToList();
-            var charges = await _charges.Query()
-                .Where(c => chargeIds.Contains(c.Id))
-                .ToListAsync(cancellationToken);
-            var chargesById = charges.ToDictionary(c => c.Id);
+            var payment = await _payments.Query()
+                .Include(p => p.Allocations)
+                .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+            if (payment is null || !payment.IsActive)
+                return false;
 
-            foreach (var allocation in payment.Allocations)
+            await using var transaction = _db.Database.IsRelational()
+                ? await _db.Database.BeginTransactionAsync(cancellationToken)
+                : null;
+            try
             {
-                if (!chargesById.TryGetValue(allocation.FeeChargeId, out var charge))
-                    throw new InvalidOperationException("A fee charge for payment reversal was not found.");
+                var chargeIds = payment.Allocations.Select(a => a.FeeChargeId).Distinct().ToList();
+                var charges = await _charges.Query()
+                    .Where(c => chargeIds.Contains(c.Id))
+                    .ToListAsync(cancellationToken);
+                var chargesById = charges.ToDictionary(c => c.Id);
 
-                charge.AmountPaid = Math.Round(
-                    Math.Max(0m, charge.AmountPaid - allocation.Amount),
-                    2,
-                    MidpointRounding.AwayFromZero);
-
-                if (charge.Status is not (FeeChargeStatus.Waived or FeeChargeStatus.Cancelled))
+                foreach (var allocation in payment.Allocations)
                 {
-                    charge.Status = charge.AmountPaid <= 0m
-                        ? FeeChargeStatus.Pending
-                        : charge.AmountPaid >= charge.Amount
-                            ? FeeChargeStatus.Paid
-                            : FeeChargeStatus.Partial;
+                    if (!chargesById.TryGetValue(allocation.FeeChargeId, out var charge))
+                        throw new InvalidOperationException("A fee charge for payment reversal was not found.");
+
+                    charge.AmountPaid = Math.Round(
+                        Math.Max(0m, charge.AmountPaid - allocation.Amount),
+                        2,
+                        MidpointRounding.AwayFromZero);
+
+                    if (charge.Status is not (FeeChargeStatus.Waived or FeeChargeStatus.Cancelled))
+                    {
+                        charge.Status = charge.AmountPaid <= 0m
+                            ? FeeChargeStatus.Pending
+                            : charge.AmountPaid >= charge.Amount
+                                ? FeeChargeStatus.Paid
+                                : FeeChargeStatus.Partial;
+                    }
+
+                    _charges.Update(charge);
                 }
 
-                _charges.Update(charge);
+                payment.IsActive = false;
+                _payments.Update(payment);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                if (transaction is not null)
+                    await transaction.CommitAsync(cancellationToken);
+                return true;
             }
-
-            payment.IsActive = false;
-            _payments.Update(payment);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-            if (transaction is not null)
-                await transaction.CommitAsync(cancellationToken);
-            return true;
-        }
-        catch
-        {
-            if (transaction is not null)
-                await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+            catch
+            {
+                if (transaction is not null)
+                    await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 
     private static PaymentDto Map(Payment entity) =>

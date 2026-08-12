@@ -617,6 +617,10 @@ internal static class PagedEntityQueries
             Enum.TryParse<ReceptionItemType>(typeRaw, ignoreCase: true, out var itemType))
             query = query.Where(e => e.ItemType == itemType);
 
+        if (q.FilterValue("direction") is { } directionRaw &&
+            Enum.TryParse<ReceptionDirection>(directionRaw, ignoreCase: true, out var direction))
+            query = query.Where(e => e.Direction == direction);
+
         if (q.FilterValue("isActive") is { } activeRaw &&
             ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
             query = query.Where(e => e.IsActive == isActive);
@@ -628,6 +632,9 @@ internal static class PagedEntityQueries
                 (e.CarrierOrSender != null && EF.Functions.ILike(e.CarrierOrSender, EfTextSearch.LikePattern(search))) ||
                 (e.TrackingOrReference != null && EF.Functions.ILike(e.TrackingOrReference, EfTextSearch.LikePattern(search))) ||
                 (e.RecipientName != null && EF.Functions.ILike(e.RecipientName, EfTextSearch.LikePattern(search))) ||
+                (e.AuthorizedPickupName1 != null && EF.Functions.ILike(e.AuthorizedPickupName1, EfTextSearch.LikePattern(search))) ||
+                (e.AuthorizedPickupName2 != null && EF.Functions.ILike(e.AuthorizedPickupName2, EfTextSearch.LikePattern(search))) ||
+                (e.DeliveredToExternalName != null && EF.Functions.ILike(e.DeliveredToExternalName, EfTextSearch.LikePattern(search))) ||
                 (e.Notes != null && EF.Functions.ILike(e.Notes, EfTextSearch.LikePattern(search))));
         }
 
@@ -636,6 +643,7 @@ internal static class PagedEntityQueries
         {
             "status" => desc ? query.OrderByDescending(e => e.Status) : query.OrderBy(e => e.Status),
             "itemtype" => desc ? query.OrderByDescending(e => e.ItemType) : query.OrderBy(e => e.ItemType),
+            "direction" => desc ? query.OrderByDescending(e => e.Direction) : query.OrderBy(e => e.Direction),
             "deliveredatutc" => desc ? query.OrderByDescending(e => e.DeliveredAtUtc) : query.OrderBy(e => e.DeliveredAtUtc),
             "isactive" => desc ? query.OrderByDescending(e => e.IsActive) : query.OrderBy(e => e.IsActive),
             _ => desc ? query.OrderByDescending(e => e.ReceivedAtUtc) : query.OrderBy(e => e.ReceivedAtUtc),

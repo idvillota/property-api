@@ -7,4 +7,8 @@ public enum ReceptionItemType
     Document = 2,
     VisitorMessage = 3,
     Other = 4,
+    WaterBill = 5,
+    EnergyBill = 6,
+    GasBill = 7,
+    AdministrationBill = 8,
 }

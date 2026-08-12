@@ -69,11 +69,14 @@ public sealed class UnitOccupancyService : IUnitOccupancyService
             Role = dto.Role,
             IsPrimary = dto.IsPrimary,
             ReceivesBilling = dto.ReceivesBilling,
+            IsCommunicationResponsible = dto.IsCommunicationResponsible,
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
             IsActive = true,
         };
         await _occupancies.AddAsync(entity, cancellationToken);
+        if (dto.IsCommunicationResponsible)
+            await ClearOtherCommunicationResponsibleAsync(dto.UnitId, excludeId: entity.Id, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Map(entity);
     }
@@ -99,10 +102,13 @@ public sealed class UnitOccupancyService : IUnitOccupancyService
         entity.Role = dto.Role;
         entity.IsPrimary = dto.IsPrimary;
         entity.ReceivesBilling = dto.ReceivesBilling;
+        entity.IsCommunicationResponsible = dto.IsCommunicationResponsible && dto.IsActive;
         entity.StartDate = dto.StartDate;
         entity.EndDate = dto.EndDate;
         entity.IsActive = dto.IsActive;
         _occupancies.Update(entity);
+        if (entity.IsCommunicationResponsible)
+            await ClearOtherCommunicationResponsibleAsync(dto.UnitId, excludeId: id, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Map(entity);
     }
@@ -114,6 +120,7 @@ public sealed class UnitOccupancyService : IUnitOccupancyService
             return false;
 
         entity.IsActive = false;
+        entity.IsCommunicationResponsible = false;
         _occupancies.Update(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return true;
@@ -190,6 +197,25 @@ public sealed class UnitOccupancyService : IUnitOccupancyService
         }
     }
 
+    private async Task ClearOtherCommunicationResponsibleAsync(
+        Guid unitId,
+        Guid? excludeId,
+        CancellationToken cancellationToken)
+    {
+        var others = await _occupancies.Query()
+            .Where(o =>
+                o.UnitId == unitId &&
+                o.IsCommunicationResponsible &&
+                (!excludeId.HasValue || o.Id != excludeId.Value))
+            .ToListAsync(cancellationToken);
+
+        foreach (var other in others)
+        {
+            other.IsCommunicationResponsible = false;
+            _occupancies.Update(other);
+        }
+    }
+
     private static UnitOccupancyDto Map(UnitOccupancy entity) =>
         new()
         {
@@ -199,6 +225,7 @@ public sealed class UnitOccupancyService : IUnitOccupancyService
             Role = entity.Role,
             IsPrimary = entity.IsPrimary,
             ReceivesBilling = entity.ReceivesBilling,
+            IsCommunicationResponsible = entity.IsCommunicationResponsible,
             StartDate = entity.StartDate,
             EndDate = entity.EndDate,
             IsActive = entity.IsActive,

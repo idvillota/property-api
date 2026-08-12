@@ -174,6 +174,10 @@ public sealed class StructureComposerService : IStructureComposerService
             throw new InvalidOperationException("Nothing to create. Add at least one unit.");
 
         var utcNow = DateTime.UtcNow;
+
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
         var buildingsCreated = 0;
         var floorsCreated = 0;
         var codeToUnitId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
@@ -281,6 +285,7 @@ public sealed class StructureComposerService : IStructureComposerService
             UnitsCreated = units.Count,
             TotalCoefficient = units.Sum(u => u.Coefficient),
         };
+        });
     }
 
     private async Task EnsurePropertyAsync(Guid horizontalPropertyId, CancellationToken cancellationToken)

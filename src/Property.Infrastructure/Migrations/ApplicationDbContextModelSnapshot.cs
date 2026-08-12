@@ -668,6 +668,14 @@ namespace Property.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AuthorizedPickupName1")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("AuthorizedPickupName2")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("CarrierOrSender")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -681,8 +689,15 @@ namespace Property.Infrastructure.Migrations
                     b.Property<Guid?>("DeliveredByEmployeeId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("DeliveredToExternalName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<Guid?>("DeliveredToPersonId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("Direction")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("HorizontalPropertyId")
                         .HasColumnType("uuid");
@@ -739,6 +754,8 @@ namespace Property.Infrastructure.Migrations
                     b.HasIndex("ReceivedByEmployeeId");
 
                     b.HasIndex("UnitId");
+
+                    b.HasIndex("TenantId", "HorizontalPropertyId", "Direction", "Status");
 
                     b.HasIndex("TenantId", "HorizontalPropertyId", "Status");
 
@@ -1149,6 +1166,9 @@ namespace Property.Infrastructure.Migrations
                         .HasColumnType("date");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsCommunicationResponsible")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsPrimary")

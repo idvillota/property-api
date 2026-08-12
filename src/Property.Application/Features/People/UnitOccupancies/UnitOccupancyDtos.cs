@@ -11,6 +11,7 @@ public sealed class UnitOccupancyDto
     public OccupancyRole Role { get; set; }
     public bool IsPrimary { get; set; }
     public bool ReceivesBilling { get; set; }
+    public bool IsCommunicationResponsible { get; set; }
     public DateOnly StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
     public bool IsActive { get; set; }
@@ -30,6 +31,8 @@ public sealed class CreateUnitOccupancyDto
     public bool IsPrimary { get; set; }
 
     public bool ReceivesBilling { get; set; }
+
+    public bool IsCommunicationResponsible { get; set; }
 
     [Required]
     public DateOnly StartDate { get; set; }
@@ -51,6 +54,8 @@ public sealed class UpdateUnitOccupancyDto
     public bool IsPrimary { get; set; }
 
     public bool ReceivesBilling { get; set; }
+
+    public bool IsCommunicationResponsible { get; set; }
 
     [Required]
     public DateOnly StartDate { get; set; }

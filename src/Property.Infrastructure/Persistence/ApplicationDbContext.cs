@@ -367,6 +367,9 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.CarrierOrSender).HasMaxLength(200);
             e.Property(x => x.TrackingOrReference).HasMaxLength(120);
             e.Property(x => x.RecipientName).HasMaxLength(200);
+            e.Property(x => x.AuthorizedPickupName1).HasMaxLength(200);
+            e.Property(x => x.AuthorizedPickupName2).HasMaxLength(200);
+            e.Property(x => x.DeliveredToExternalName).HasMaxLength(200);
             e.Property(x => x.Notes).HasMaxLength(4000);
             e.HasOne(x => x.HorizontalProperty)
                 .WithMany()
@@ -393,6 +396,7 @@ public sealed class ApplicationDbContext : DbContext
                 .HasForeignKey(x => x.DeliveredByEmployeeId)
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Direction, x.Status });
             e.HasIndex(x => new { x.TenantId, x.UnitId, x.Status });
         });
 

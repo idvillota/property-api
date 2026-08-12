@@ -40,6 +40,24 @@ public sealed class ReceptionItemsController : ControllerBase
         }
     }
 
+    [HttpPost("bulk-utility-bills")]
+    public async Task<ActionResult<BulkUtilityBillsResultDto>> BulkUtilityBills(
+        [FromBody] BulkUtilityBillsDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            return Ok(await _service.CreateBulkUtilityBillsAsync(dto, cancellationToken));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ReceptionItemDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
@@ -89,11 +107,10 @@ public sealed class ReceptionItemsController : ControllerBase
     [HttpPost("{id:guid}/deliver")]
     public async Task<ActionResult<ReceptionItemDto>> Deliver(
         Guid id,
-        [FromBody] DeliverReceptionItemDto dto,
+        [FromBody] DeliverReceptionItemDto? dto,
         CancellationToken cancellationToken = default)
     {
-        if (!ModelState.IsValid)
-            return ValidationProblem(ModelState);
+        dto ??= new DeliverReceptionItemDto();
 
         try
         {

@@ -367,6 +367,7 @@ public sealed class UnitService : IUnitService
                 Role = o.Role,
                 IsPrimary = o.IsPrimary,
                 ReceivesBilling = o.ReceivesBilling,
+                IsCommunicationResponsible = o.IsCommunicationResponsible,
             };
 
         var habitants = rows

@@ -9,6 +9,7 @@ public sealed class ReceptionItemDto
     public Guid HorizontalPropertyId { get; set; }
     public Guid? UnitId { get; set; }
     public Guid? PersonId { get; set; }
+    public ReceptionDirection Direction { get; set; }
     public ReceptionItemType ItemType { get; set; }
     public ReceptionItemStatus Status { get; set; }
     public DateTime ReceivedAtUtc { get; set; }
@@ -19,6 +20,9 @@ public sealed class ReceptionItemDto
     public string? CarrierOrSender { get; set; }
     public string? TrackingOrReference { get; set; }
     public string? RecipientName { get; set; }
+    public string? AuthorizedPickupName1 { get; set; }
+    public string? AuthorizedPickupName2 { get; set; }
+    public string? DeliveredToExternalName { get; set; }
     public string? Notes { get; set; }
     public bool IsActive { get; set; }
     public string? UnitCode { get; set; }
@@ -38,12 +42,12 @@ public sealed class CreateReceptionItemDto
     public Guid PersonId { get; set; }
 
     [Required]
+    public ReceptionDirection Direction { get; set; } = ReceptionDirection.Inbound;
+
+    [Required]
     public ReceptionItemType ItemType { get; set; }
 
     public ReceptionItemStatus Status { get; set; } = ReceptionItemStatus.PendingPickup;
-
-    [Required]
-    public DateTime ReceivedAtUtc { get; set; }
 
     public Guid? ReceivedByEmployeeId { get; set; }
 
@@ -52,6 +56,12 @@ public sealed class CreateReceptionItemDto
 
     [MaxLength(120)]
     public string? TrackingOrReference { get; set; }
+
+    [MaxLength(200)]
+    public string? AuthorizedPickupName1 { get; set; }
+
+    [MaxLength(200)]
+    public string? AuthorizedPickupName2 { get; set; }
 
     [MaxLength(4000)]
     public string? Notes { get; set; }
@@ -69,13 +79,13 @@ public sealed class UpdateReceptionItemDto
     public Guid PersonId { get; set; }
 
     [Required]
+    public ReceptionDirection Direction { get; set; }
+
+    [Required]
     public ReceptionItemType ItemType { get; set; }
 
     [Required]
     public ReceptionItemStatus Status { get; set; }
-
-    [Required]
-    public DateTime ReceivedAtUtc { get; set; }
 
     public Guid? ReceivedByEmployeeId { get; set; }
 
@@ -91,6 +101,15 @@ public sealed class UpdateReceptionItemDto
     [MaxLength(120)]
     public string? TrackingOrReference { get; set; }
 
+    [MaxLength(200)]
+    public string? AuthorizedPickupName1 { get; set; }
+
+    [MaxLength(200)]
+    public string? AuthorizedPickupName2 { get; set; }
+
+    [MaxLength(200)]
+    public string? DeliveredToExternalName { get; set; }
+
     [MaxLength(4000)]
     public string? Notes { get; set; }
 
@@ -99,8 +118,12 @@ public sealed class UpdateReceptionItemDto
 
 public sealed class DeliverReceptionItemDto
 {
-    [Required]
-    public Guid DeliveredToPersonId { get; set; }
+    /// <summary>Inbound: habitant who receives. Required for inbound.</summary>
+    public Guid? DeliveredToPersonId { get; set; }
+
+    /// <summary>Outbound: must match AuthorizedPickupName1 or AuthorizedPickupName2.</summary>
+    [MaxLength(200)]
+    public string? DeliveredToExternalName { get; set; }
 
     public Guid? DeliveredByEmployeeId { get; set; }
 
@@ -111,4 +134,27 @@ public sealed class DeliverReceptionItemDto
 public sealed class ReceptionPendingCountDto
 {
     public int PendingPickupCount { get; set; }
+}
+
+public sealed class BulkUtilityBillsDto
+{
+    [Required]
+    public Guid HorizontalPropertyId { get; set; }
+
+    [Required]
+    public ReceptionItemType BillType { get; set; }
+
+    /// <summary>Billing period as yyyy-MM (defaults to current UTC month).</summary>
+    [MaxLength(7)]
+    public string? Period { get; set; }
+}
+
+public sealed class BulkUtilityBillsResultDto
+{
+    public string Period { get; set; } = "";
+    public ReceptionItemType BillType { get; set; }
+    public int CreatedCount { get; set; }
+    public int SkippedAlreadyExistsCount { get; set; }
+    public int SkippedNoHabitantCount { get; set; }
+    public int DwellingUnitCount { get; set; }
 }
