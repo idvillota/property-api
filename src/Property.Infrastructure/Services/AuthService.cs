@@ -70,6 +70,7 @@ public sealed class AuthService : IAuthService
         {
             NewRole(tenant.Id, SystemRoles.Administrator),
             NewRole(tenant.Id, SystemRoles.Manager),
+            NewRole(tenant.Id, SystemRoles.Receptionist),
         };
 
         var tenantUser = new TenantUser

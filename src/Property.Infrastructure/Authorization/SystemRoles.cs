@@ -4,10 +4,11 @@ public static class SystemRoles
 {
     public const string Administrator = "Administrator";
     public const string Manager = "Manager";
+    public const string Receptionist = "Receptionist";
 
     /// <summary>Legacy name kept for migrating existing databases.</summary>
     public const string Owner = "Owner";
 
     public static IReadOnlyList<string> All { get; } =
-        [Administrator, Manager];
+        [Administrator, Manager, Receptionist];
 }

@@ -13,7 +13,55 @@ public static class PermissionBootstrap
         CancellationToken cancellationToken = default)
     {
         await SyncFeatureCatalogAsync(db, logger, cancellationToken);
+        await EnsureSystemRolesAsync(db, logger, cancellationToken);
         await GrantMissingDefaultRoleFeaturesAsync(db, logger, cancellationToken);
+    }
+
+    private static async Task EnsureSystemRolesAsync(
+        ApplicationDbContext db,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var tenants = await db.Tenants.AsNoTracking().Select(t => t.Id).ToListAsync(cancellationToken);
+        if (tenants.Count == 0)
+            return;
+
+        var existing = await db.Roles
+            .IgnoreQueryFilters()
+            .Where(r => tenants.Contains(r.TenantId) && SystemRoles.All.Contains(r.Name))
+            .Select(r => new { r.TenantId, r.Name })
+            .ToListAsync(cancellationToken);
+        var existingSet = existing
+            .Select(x => (x.TenantId, x.Name))
+            .ToHashSet();
+
+        var added = 0;
+        foreach (var tenantId in tenants)
+        {
+            foreach (var roleName in SystemRoles.All)
+            {
+                if (existingSet.Contains((tenantId, roleName)))
+                    continue;
+
+                await db.Roles.AddAsync(
+                    new Role
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = tenantId,
+                        Name = roleName,
+                        NormalizedName = roleName.ToUpperInvariant(),
+                    },
+                    cancellationToken);
+                existingSet.Add((tenantId, roleName));
+                added++;
+            }
+        }
+
+        if (added == 0)
+            return;
+
+        await db.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Created {Count} missing system role(s).", added);
     }
 
     private static async Task SyncFeatureCatalogAsync(
@@ -126,7 +174,8 @@ public static class PermissionBootstrap
             .Where(r =>
                 r.NormalizedName == SystemRoles.Administrator.ToUpperInvariant()
                 || r.NormalizedName == SystemRoles.Owner.ToUpperInvariant()
-                || r.NormalizedName == SystemRoles.Manager.ToUpperInvariant())
+                || r.NormalizedName == SystemRoles.Manager.ToUpperInvariant()
+                || r.NormalizedName == SystemRoles.Receptionist.ToUpperInvariant())
             .ToListAsync(cancellationToken);
 
         if (roles.Count == 0)

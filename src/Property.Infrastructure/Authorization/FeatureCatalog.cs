@@ -39,5 +39,10 @@ public static class FeatureCatalog
             [SystemRoles.Administrator] = FeatureCodes.All,
             [SystemRoles.Owner] = FeatureCodes.All,
             [SystemRoles.Manager] = FeatureCodes.All,
+            [SystemRoles.Receptionist] =
+            [
+                FeatureCodes.DashboardView,
+                FeatureCodes.ReceptionManage,
+            ],
         };
 }
