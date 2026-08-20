@@ -662,6 +662,95 @@ namespace Property.Infrastructure.Migrations
                     b.ToTable("People");
                 });
 
+            modelBuilder.Entity("Property.Domain.Entities.MuralPost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AreaLabel")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("AuthorDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("AuthorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("ContactNote")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("HorizontalPropertyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsPinned")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("PublishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HorizontalPropertyId");
+
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("TenantId", "HorizontalPropertyId", "IsPinned", "PublishedAtUtc");
+
+                    b.HasIndex("TenantId", "HorizontalPropertyId", "Kind", "Category");
+
+                    b.ToTable("MuralPosts");
+                });
+
             modelBuilder.Entity("Property.Domain.Entities.ReceptionItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1480,6 +1569,24 @@ namespace Property.Infrastructure.Migrations
                     b.Navigation("FeeCharge");
 
                     b.Navigation("Payment");
+                });
+
+            modelBuilder.Entity("Property.Domain.Entities.MuralPost", b =>
+                {
+                    b.HasOne("Property.Domain.Entities.HorizontalProperty", "HorizontalProperty")
+                        .WithMany()
+                        .HasForeignKey("HorizontalPropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Property.Domain.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("HorizontalProperty");
+
+                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("Property.Domain.Entities.ReceptionItem", b =>

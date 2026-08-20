@@ -649,5 +649,57 @@ internal static class PagedEntityQueries
             _ => desc ? query.OrderByDescending(e => e.ReceivedAtUtc) : query.OrderBy(e => e.ReceivedAtUtc),
         };
     }
+
+    public static IQueryable<MuralPost> ShapeMuralPosts(IQueryable<MuralPost> query, ListQuery q)
+    {
+        if (!q.IncludeInactive)
+            query = query.Where(e => e.IsActive);
+
+        var includeHidden = q.FilterValue("includeHidden") is { } hiddenRaw &&
+                            ListQueryHelpers.TryParseBool(hiddenRaw, out var showHidden) &&
+                            showHidden;
+        if (!includeHidden)
+            query = query.Where(e => !e.IsHidden);
+
+        var includeExpired = q.FilterValue("includeExpired") is { } expiredRaw &&
+                             ListQueryHelpers.TryParseBool(expiredRaw, out var showExpired) &&
+                             showExpired;
+        if (!includeExpired)
+        {
+            var now = DateTime.UtcNow;
+            query = query.Where(e => e.ExpiresAtUtc == null || e.ExpiresAtUtc >= now);
+        }
+
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+        {
+            query = query.Where(e =>
+                EF.Functions.ILike(e.Title, EfTextSearch.LikePattern(search)) ||
+                EF.Functions.ILike(e.Body, EfTextSearch.LikePattern(search)) ||
+                (e.AreaLabel != null && EF.Functions.ILike(e.AreaLabel, EfTextSearch.LikePattern(search))) ||
+                EF.Functions.ILike(e.AuthorDisplayName, EfTextSearch.LikePattern(search)));
+        }
+
+        if (q.FilterValue("horizontalPropertyId") is { } hpRaw &&
+            ListQueryHelpers.TryParseGuid(hpRaw, out var horizontalPropertyId))
+            query = query.Where(e => e.HorizontalPropertyId == horizontalPropertyId);
+
+        if (q.FilterValue("kind") is { } kindRaw &&
+            Enum.TryParse<MuralPostKind>(kindRaw, ignoreCase: true, out var kind))
+            query = query.Where(e => e.Kind == kind);
+
+        if (q.FilterValue("category") is { } categoryRaw &&
+            Enum.TryParse<MuralPostCategory>(categoryRaw, ignoreCase: true, out var category))
+            query = query.Where(e => e.Category == category);
+
+        if (q.FilterValue("isActive") is { } activeRaw &&
+            ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
+            query = query.Where(e => e.IsActive == isActive);
+
+        // Feed order: pinned first, then newest.
+        return query
+            .OrderByDescending(e => e.IsPinned)
+            .ThenByDescending(e => e.PublishedAtUtc);
+    }
 }
 

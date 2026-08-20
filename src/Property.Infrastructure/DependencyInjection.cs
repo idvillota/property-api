@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<IReceptionNotificationService, ReceptionNotificationService>();
         services.AddScoped<IReceptionItemService, ReceptionItemService>();
+        services.AddScoped<IMuralPostService, MuralPostService>();
         services.AddScoped<IReportService, ReportService>();
 
         return services;
