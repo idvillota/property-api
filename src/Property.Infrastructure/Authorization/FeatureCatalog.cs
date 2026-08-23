@@ -48,6 +48,15 @@ public static class FeatureCatalog
         new(Guid.Parse("f1000041-0047-4047-8047-000000000041"), FeatureCodes.AccountingTax, "Withholding tax", "Accounting", 760),
         new(Guid.Parse("f1000042-0048-4048-8048-000000000042"), FeatureCodes.AccountingReports, "Financial statements and close", "Accounting", 770),
         new(Guid.Parse("f1000043-0049-4049-8049-000000000043"), FeatureCodes.AccountingBank, "Bank reconciliation", "Accounting", 780),
+        new(Guid.Parse("f1000044-004a-404a-804a-000000000044"), FeatureCodes.AssemblyManage, "Manage assemblies", "Assemblies", 810),
+        new(Guid.Parse("f1000045-004b-404b-804b-000000000045"), FeatureCodes.AssemblyVote, "Assembly voting", "Assemblies", 820),
+        new(Guid.Parse("f1000046-004c-404c-804c-000000000046"), FeatureCodes.VisitorParking, "Visitor parking", "Reception", 640),
+        new(Guid.Parse("f1000047-004d-404d-804d-000000000047"), FeatureCodes.DocsLibrary, "Digital library", "Community", 560),
+        new(Guid.Parse("f1000048-004e-404e-804e-000000000048"), FeatureCodes.MaintenancePlan, "Preventive maintenance", "Community", 570),
+        new(Guid.Parse("f1000049-004f-404f-804f-000000000049"), FeatureCodes.InsurancePolicies, "Insurance policies", "Community", 580),
+        new(Guid.Parse("f100004a-0050-4050-8050-00000000004a"), FeatureCodes.PollsManage, "Community polls", "Community", 590),
+        new(Guid.Parse("f100004b-0051-4051-8051-00000000004b"), FeatureCodes.PortalLibrary, "Portal library", "Portal", 50),
+        new(Guid.Parse("f100004c-0052-4052-8052-00000000004c"), FeatureCodes.PortalPolls, "Portal polls", "Portal", 55),
     ];
 
     public static IReadOnlyDictionary<string, Guid> IdsByCode { get; } =
@@ -64,6 +73,7 @@ public static class FeatureCatalog
                 FeatureCodes.ReceptionManage,
                 FeatureCodes.ReceptionVisits,
                 FeatureCodes.ReceptionIntercom,
+                FeatureCodes.VisitorParking,
             ],
             [SystemRoles.Accountant] =
             [
@@ -89,6 +99,9 @@ public static class FeatureCatalog
                 FeatureCodes.PortalMuralRead,
                 FeatureCodes.PqrsCreate,
                 FeatureCodes.PortalVisits,
+                FeatureCodes.PortalLibrary,
+                FeatureCodes.PortalPolls,
+                FeatureCodes.AssemblyVote,
             ],
             [SystemRoles.Resident] =
             [
@@ -99,6 +112,9 @@ public static class FeatureCatalog
                 FeatureCodes.PortalMuralRead,
                 FeatureCodes.PqrsCreate,
                 FeatureCodes.PortalVisits,
+                FeatureCodes.PortalLibrary,
+                FeatureCodes.PortalPolls,
+                FeatureCodes.AssemblyVote,
             ],
         };
 }

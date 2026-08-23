@@ -11,6 +11,9 @@ using Property.Infrastructure.Payments;
 using Property.Infrastructure.Persistence;
 using Property.Infrastructure.Services;
 using Property.Infrastructure.Services.Accounting;
+using Property.Infrastructure.Services.Assemblies;
+using Property.Infrastructure.Services.Community;
+using Property.Infrastructure.Services.Parking;
 using Property.Infrastructure.Storage;
 
 namespace Property.Infrastructure;
@@ -98,6 +101,12 @@ public static class DependencyInjection
         services.AddScoped<IMuralPostService, MuralPostService>();
         services.AddScoped<IPqrsService, PqrsService>();
         services.AddScoped<IReportService, ReportService>();
+        services.AddScoped<IAssemblyService, AssemblyService>();
+        services.AddScoped<IVisitorParkingService, VisitorParkingService>();
+        services.AddScoped<ILibraryService, LibraryService>();
+        services.AddScoped<IMaintenanceService, MaintenanceService>();
+        services.AddScoped<IInsuranceService, InsuranceService>();
+        services.AddScoped<IPollService, PollService>();
 
         return services;
     }

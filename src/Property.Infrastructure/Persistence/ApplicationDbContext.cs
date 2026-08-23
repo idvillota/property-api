@@ -70,6 +70,23 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<BankStatement> BankStatements => Set<BankStatement>();
     public DbSet<BankStatementLine> BankStatementLines => Set<BankStatementLine>();
 
+    public DbSet<Assembly> Assemblies => Set<Assembly>();
+    public DbSet<AgendaItem> AgendaItems => Set<AgendaItem>();
+    public DbSet<AssemblyAttendance> AssemblyAttendances => Set<AssemblyAttendance>();
+    public DbSet<AssemblyProxy> AssemblyProxies => Set<AssemblyProxy>();
+    public DbSet<AssemblyMotion> AssemblyMotions => Set<AssemblyMotion>();
+    public DbSet<AssemblyVote> AssemblyVotes => Set<AssemblyVote>();
+    public DbSet<VisitorParkingSettings> VisitorParkingSettings => Set<VisitorParkingSettings>();
+    public DbSet<ParkingShift> ParkingShifts => Set<ParkingShift>();
+    public DbSet<ParkingTicket> ParkingTickets => Set<ParkingTicket>();
+    public DbSet<LibraryDocument> LibraryDocuments => Set<LibraryDocument>();
+    public DbSet<MaintenancePlan> MaintenancePlans => Set<MaintenancePlan>();
+    public DbSet<MaintenanceTask> MaintenanceTasks => Set<MaintenanceTask>();
+    public DbSet<InsurancePolicy> InsurancePolicies => Set<InsurancePolicy>();
+    public DbSet<Poll> Polls => Set<Poll>();
+    public DbSet<PollOption> PollOptions => Set<PollOption>();
+    public DbSet<PollVote> PollVotes => Set<PollVote>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(e =>
@@ -681,6 +698,94 @@ public sealed class ApplicationDbContext : DbContext
     private void ApplyTenantFilters(ModelBuilder modelBuilder)
     {
 
+
+        modelBuilder.Entity<Assembly>(e =>
+        {
+            e.ToTable("Assemblies");
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Location).HasMaxLength(200);
+            e.Property(x => x.QuorumPercentRequired).HasPrecision(18, 2);
+            e.HasMany(x => x.AgendaItems).WithOne(x => x.Assembly).HasForeignKey(x => x.AssemblyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.MinutesFileAsset).WithMany().HasForeignKey(x => x.MinutesFileAssetId).OnDelete(DeleteBehavior.SetNull);
+        });
+        modelBuilder.Entity<AgendaItem>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(200);
+        });
+        modelBuilder.Entity<AssemblyAttendance>(e =>
+        {
+            e.HasIndex(x => new { x.AssemblyId, x.UnitId }).IsUnique();
+            e.Property(x => x.CoefficientSnapshot).HasPrecision(18, 6);
+        });
+        modelBuilder.Entity<AssemblyProxy>(e =>
+        {
+            e.Property(x => x.CoefficientSnapshot).HasPrecision(18, 6);
+        });
+        modelBuilder.Entity<AssemblyMotion>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.HasMany(x => x.Votes).WithOne(x => x.AssemblyMotion).HasForeignKey(x => x.AssemblyMotionId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<AssemblyVote>(e =>
+        {
+            e.HasIndex(x => new { x.AssemblyMotionId, x.UnitId }).IsUnique();
+            e.Property(x => x.Weight).HasPrecision(18, 6);
+        });
+        modelBuilder.Entity<VisitorParkingSettings>(e =>
+        {
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId }).IsUnique();
+            e.Property(x => x.HourlyRate).HasPrecision(18, 2);
+            e.Property(x => x.DailyCap).HasPrecision(18, 2);
+        });
+        modelBuilder.Entity<ParkingShift>(e =>
+        {
+            e.Property(x => x.CollectedTotal).HasPrecision(18, 2);
+            e.Property(x => x.DeclaredCash).HasPrecision(18, 2);
+        });
+        modelBuilder.Entity<ParkingTicket>(e =>
+        {
+            e.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            e.Property(x => x.Code).HasMaxLength(64);
+            e.Property(x => x.Plate).HasMaxLength(32);
+            e.Property(x => x.FeeAmount).HasPrecision(18, 2);
+        });
+        modelBuilder.Entity<LibraryDocument>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Category).HasMaxLength(80);
+            e.HasOne(x => x.FileAsset).WithMany().HasForeignKey(x => x.FileAssetId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<MaintenancePlan>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Responsible).HasMaxLength(120);
+            e.HasMany(x => x.Tasks).WithOne(x => x.MaintenancePlan).HasForeignKey(x => x.MaintenancePlanId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<MaintenanceTask>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(200);
+        });
+        modelBuilder.Entity<InsurancePolicy>(e =>
+        {
+            e.Property(x => x.InsurerName).HasMaxLength(160);
+            e.Property(x => x.PolicyNumber).HasMaxLength(80);
+        });
+        modelBuilder.Entity<Poll>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.HasMany(x => x.Options).WithOne(x => x.Poll).HasForeignKey(x => x.PollId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Votes).WithOne(x => x.Poll).HasForeignKey(x => x.PollId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<PollOption>(e =>
+        {
+            e.Property(x => x.Label).HasMaxLength(200);
+        });
+        modelBuilder.Entity<PollVote>(e =>
+        {
+            e.HasIndex(x => new { x.PollId, x.UnitId });
+            e.HasIndex(x => new { x.PollId, x.PersonId });
+        });
+
         modelBuilder.Entity<LedgerAccount>(e =>
         {
             e.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
@@ -908,6 +1013,68 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<AuditEvent>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<LedgerAccount>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<JournalEntry>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<JournalLine>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<Budget>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<BudgetLine>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<Vendor>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<ApInvoice>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<ApPayment>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<PettyCashFund>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<PettyCashExpense>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<WithholdingTaxRate>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<AccountingPeriod>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<BankStatement>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<BankStatementLine>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<Assembly>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<AgendaItem>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<AssemblyAttendance>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<AssemblyProxy>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<AssemblyMotion>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<AssemblyVote>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<VisitorParkingSettings>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<ParkingShift>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<ParkingTicket>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<LibraryDocument>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<MaintenancePlan>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<MaintenanceTask>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<InsurancePolicy>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<Poll>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<PollOption>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+        modelBuilder.Entity<PollVote>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
     }
 

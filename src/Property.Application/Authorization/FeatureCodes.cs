@@ -42,6 +42,15 @@ public static class FeatureCodes
     public const string AccountingTax = "accounting.tax";
     public const string AccountingReports = "accounting.reports";
     public const string AccountingBank = "accounting.bank";
+    public const string AssemblyManage = "assembly.manage";
+    public const string AssemblyVote = "assembly.vote";
+    public const string VisitorParking = "visitor.parking";
+    public const string DocsLibrary = "docs.library";
+    public const string MaintenancePlan = "maintenance.plan";
+    public const string InsurancePolicies = "insurance.policies";
+    public const string PollsManage = "polls.manage";
+    public const string PortalLibrary = "portal.library";
+    public const string PortalPolls = "portal.polls";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -85,6 +94,15 @@ public static class FeatureCodes
         AccountingTax,
         AccountingReports,
         AccountingBank,
+        AssemblyManage,
+        AssemblyVote,
+        VisitorParking,
+        DocsLibrary,
+        MaintenancePlan,
+        InsurancePolicies,
+        PollsManage,
+        PortalLibrary,
+        PortalPolls,
     ];
 
     public static IReadOnlyList<string> AccountingAll { get; } =

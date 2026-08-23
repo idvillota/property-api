@@ -25,7 +25,7 @@ public sealed class RolePermissionExpectationsTests
     public void Portal_roles_receive_portal_access_only(string roleName)
     {
         var permissions = FeatureCatalog.DefaultFeaturesByRole[roleName];
-        Assert.Equal(7, permissions.Count);
+        Assert.Equal(10, permissions.Count);
         Assert.Contains(FeatureCodes.PortalAccess, permissions);
         Assert.Contains(FeatureCodes.PortalAccountRead, permissions);
         Assert.Contains(FeatureCodes.PortalReservations, permissions);
@@ -33,6 +33,9 @@ public sealed class RolePermissionExpectationsTests
         Assert.Contains(FeatureCodes.PortalMuralRead, permissions);
         Assert.Contains(FeatureCodes.PqrsCreate, permissions);
         Assert.Contains(FeatureCodes.PortalVisits, permissions);
+        Assert.Contains(FeatureCodes.PortalLibrary, permissions);
+        Assert.Contains(FeatureCodes.PortalPolls, permissions);
+        Assert.Contains(FeatureCodes.AssemblyVote, permissions);
     }
 
     [Fact]
@@ -49,11 +52,12 @@ public sealed class RolePermissionExpectationsTests
     public void Receptionist_role_is_limited_to_reception_and_dashboard()
     {
         var permissions = Permissions(SystemRoles.Receptionist);
-        Assert.Equal(4, permissions.Count);
+        Assert.Equal(5, permissions.Count);
         Assert.Contains(FeatureCodes.DashboardView, permissions);
         Assert.Contains(FeatureCodes.ReceptionManage, permissions);
         Assert.Contains(FeatureCodes.ReceptionVisits, permissions);
         Assert.Contains(FeatureCodes.ReceptionIntercom, permissions);
+        Assert.Contains(FeatureCodes.VisitorParking, permissions);
         Assert.DoesNotContain(FeatureCodes.BillingPayments, permissions);
     }
 
