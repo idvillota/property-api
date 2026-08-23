@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Property.Application.Common.Interfaces;
+using Property.Application.Messaging;
 using Property.Domain.Entities;
 using Property.Domain.Enums;
 
@@ -12,7 +13,7 @@ public sealed class ReceptionNotificationService : IReceptionNotificationService
     private readonly IRepository<Person> _people;
     private readonly IRepository<Unit> _units;
     private readonly IRepository<HorizontalProperty> _properties;
-    private readonly IEmailSender _emailSender;
+    private readonly IOutboxWriter _outbox;
     private readonly ILogger<ReceptionNotificationService> _logger;
 
     public ReceptionNotificationService(
@@ -20,14 +21,14 @@ public sealed class ReceptionNotificationService : IReceptionNotificationService
         IRepository<Person> people,
         IRepository<Unit> units,
         IRepository<HorizontalProperty> properties,
-        IEmailSender emailSender,
+        IOutboxWriter outbox,
         ILogger<ReceptionNotificationService> logger)
     {
         _items = items;
         _people = people;
         _units = units;
         _properties = properties;
-        _emailSender = emailSender;
+        _outbox = outbox;
         _logger = logger;
     }
 
@@ -41,7 +42,8 @@ public sealed class ReceptionNotificationService : IReceptionNotificationService
     {
         try
         {
-            var item = await _items.Query().AsNoTracking()
+            // Prefer tracked entity so enqueue can share the same SaveChanges as the use case (ARCH-003).
+            var item = await _items.Query()
                 .FirstOrDefaultAsync(e => e.Id == receptionItemId, cancellationToken);
             if (item?.PersonId is null)
                 return;
@@ -89,11 +91,20 @@ public sealed class ReceptionNotificationService : IReceptionNotificationService
                 propertyName,
                 deliveredToHabitantName,
                 completed);
-            await _emailSender.SendAsync(person.Email, subject, body, cancellationToken);
+
+            await _outbox.EnqueueAsync(
+                OutboxMessageTypes.EmailSend,
+                new EmailSendPayload
+                {
+                    ToEmail = person.Email,
+                    Subject = subject,
+                    HtmlBody = body,
+                },
+                cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to send reception notification for item {ItemId}", receptionItemId);
+            _logger.LogWarning(ex, "Failed to enqueue reception notification for item {ItemId}", receptionItemId);
         }
     }
 

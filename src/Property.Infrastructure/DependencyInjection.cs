@@ -5,6 +5,7 @@ using Property.Application.Common.Interfaces;
 using Property.Application.Common.Options;
 using Property.Infrastructure.Common;
 using Property.Infrastructure.Identity;
+using Property.Infrastructure.Messaging;
 using Property.Infrastructure.Persistence;
 using Property.Infrastructure.Services;
 
@@ -56,7 +57,11 @@ public static class DependencyInjection
         services.AddScoped<ICommonAreaService, CommonAreaService>();
         services.AddScoped<IReservationService, ReservationService>();
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+        services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
         services.AddScoped<IEmailSender, SmtpEmailSender>();
+        services.AddScoped<IOutboxWriter, OutboxWriter>();
+        services.AddScoped<IOutboxDispatcher, OutboxDispatcher>();
+        services.AddScoped<IOutboxMessageHandler, EmailSendOutboxHandler>();
         services.AddScoped<IReceptionNotificationService, ReceptionNotificationService>();
         services.AddScoped<IReceptionItemService, ReceptionItemService>();
         services.AddScoped<IMuralPostService, MuralPostService>();

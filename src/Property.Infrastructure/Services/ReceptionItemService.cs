@@ -101,8 +101,8 @@ public sealed class ReceptionItemService : IReceptionItemService
             IsActive = true,
         };
         await _items.AddAsync(entity, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _notifications.NotifyItemStartedAsync(entity.Id, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         var list = await EnrichAsync([entity], cancellationToken);
         return list[0];
     }
@@ -253,8 +253,8 @@ public sealed class ReceptionItemService : IReceptionItemService
             entity.Notes = dto.Notes.Trim();
 
         _items.Update(entity);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _notifications.NotifyItemCompletedAsync(entity.Id, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         var list = await EnrichAsync([entity], cancellationToken);
         return list[0];
     }
@@ -401,10 +401,11 @@ public sealed class ReceptionItemService : IReceptionItemService
         }
 
         if (created > 0)
+        {
+            foreach (var id in createdIds)
+                await _notifications.NotifyItemStartedAsync(id, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        foreach (var id in createdIds)
-            await _notifications.NotifyItemStartedAsync(id, cancellationToken);
+        }
 
         return new BulkUtilityBillsResultDto
         {

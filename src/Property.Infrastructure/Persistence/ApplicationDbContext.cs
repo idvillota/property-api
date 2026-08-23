@@ -43,6 +43,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<ReceptionItem> ReceptionItems => Set<ReceptionItem>();
     public DbSet<MuralPost> MuralPosts => Set<MuralPost>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -441,6 +442,16 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Kind, x.Category });
         });
 
+        modelBuilder.Entity<OutboxMessage>(e =>
+        {
+            e.Property(x => x.MessageType).HasMaxLength(120);
+            e.Property(x => x.PayloadJson).HasColumnType("text");
+            e.Property(x => x.LastError).HasMaxLength(2000);
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.Status, x.NextAttemptUtc });
+            e.HasIndex(x => new { x.TenantId, x.Status, x.CreatedAtUtc });
+        });
+
         ApplyTenantFilters(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
@@ -520,6 +531,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<MuralPost>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<OutboxMessage>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
     }
 
