@@ -18,6 +18,7 @@ public sealed class AuthService : IAuthService
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IRolePermissionService _rolePermissions;
     private readonly ICurrentTenantContext _tenantContext;
+    private readonly IUserPersonLinkService _userPersonLinks;
     private readonly PlatformOptions _platform;
 
     public AuthService(
@@ -26,6 +27,7 @@ public sealed class AuthService : IAuthService
         IJwtTokenService jwtTokenService,
         IRolePermissionService rolePermissions,
         ICurrentTenantContext tenantContext,
+        IUserPersonLinkService userPersonLinks,
         IOptions<PlatformOptions> platform)
     {
         _unitOfWork = unitOfWork;
@@ -33,6 +35,7 @@ public sealed class AuthService : IAuthService
         _jwtTokenService = jwtTokenService;
         _rolePermissions = rolePermissions;
         _tenantContext = tenantContext;
+        _userPersonLinks = userPersonLinks;
         _platform = platform.Value;
     }
 
@@ -177,12 +180,19 @@ public sealed class AuthService : IAuthService
             user.Id,
             membership.TenantId,
             cancellationToken);
+
+        // Resolve portal scope under the selected tenant (ARCH-001).
+        _tenantContext.TenantId = membership.TenantId;
+        var (personId, unitIds) = await _userPersonLinks.GetPortalScopeAsync(user.Id, cancellationToken);
+
         var token = _jwtTokenService.CreateAccessToken(
             user.Id,
             membership.TenantId,
             user.Email,
             roles,
-            permissions);
+            permissions,
+            personId,
+            unitIds);
         return new AuthResponseDto
         {
             AccessToken = token,

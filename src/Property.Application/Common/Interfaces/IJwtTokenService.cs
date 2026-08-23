@@ -7,5 +7,7 @@ public interface IJwtTokenService
         Guid tenantId,
         string email,
         IReadOnlyList<string> roles,
-        IReadOnlyList<string> permissions);
+        IReadOnlyList<string> permissions,
+        Guid? personId = null,
+        IReadOnlyList<Guid>? unitIds = null);
 }

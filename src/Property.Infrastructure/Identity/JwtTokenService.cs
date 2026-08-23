@@ -24,7 +24,9 @@ public sealed class JwtTokenService : IJwtTokenService
         Guid tenantId,
         string email,
         IReadOnlyList<string> roles,
-        IReadOnlyList<string> permissions)
+        IReadOnlyList<string> permissions,
+        Guid? personId = null,
+        IReadOnlyList<Guid>? unitIds = null)
     {
         var claims = new List<Claim>
         {
@@ -34,6 +36,16 @@ public sealed class JwtTokenService : IJwtTokenService
         };
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
         claims.AddRange(permissions.Select(p => new Claim(PermissionClaimType, p)));
+
+        if (personId is Guid pid && pid != Guid.Empty)
+        {
+            claims.Add(new Claim(PortalClaims.PersonId, pid.ToString()));
+            if (unitIds is { Count: > 0 })
+            {
+                foreach (var unitId in unitIds.Distinct())
+                    claims.Add(new Claim(PortalClaims.UnitId, unitId.ToString()));
+            }
+        }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.SigningKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

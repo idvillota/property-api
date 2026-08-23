@@ -42,7 +42,9 @@ public sealed class AuthServiceTests
                     It.IsAny<Guid>(),
                     It.IsAny<string>(),
                     It.IsAny<IReadOnlyList<string>>(),
-                    It.IsAny<IReadOnlyList<string>>()))
+                    It.IsAny<IReadOnlyList<string>>(),
+                    It.IsAny<Guid?>(),
+                    It.IsAny<IReadOnlyList<Guid>>()))
                 .Returns("test-token");
         }
 
@@ -52,12 +54,16 @@ public sealed class AuthServiceTests
         {
             AdminEmails = ["idvillota@gmail.com"],
         });
+        var links = new Mock<IUserPersonLinkService>();
+        links.Setup(l => l.GetPortalScopeAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((null, (IReadOnlyList<Guid>)Array.Empty<Guid>()));
         return new AuthService(
             fx.UnitOfWork,
             new BcryptPasswordHasher(),
             jwt.Object,
             rolePermissions,
             tenantContext,
+            links.Object,
             platform);
     }
 
@@ -119,7 +125,9 @@ public sealed class AuthServiceTests
                 It.IsAny<Guid>(),
                 It.IsAny<string>(),
                 It.IsAny<IReadOnlyList<string>>(),
-                It.IsAny<IReadOnlyList<string>>()))
+                It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<Guid?>(),
+                It.IsAny<IReadOnlyList<Guid>>()))
             .Returns("jwt-value");
         var sut = CreateSut(fx, jwt);
         await sut.RegisterTenantAsync(

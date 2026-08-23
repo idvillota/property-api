@@ -47,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IStructureComposerService, StructureComposerService>();
         services.AddScoped<IPersonService, PersonService>();
         services.AddScoped<IUnitOccupancyService, UnitOccupancyService>();
+        services.AddScoped<IUserPersonLinkService, UserPersonLinkService>();
         services.AddScoped<IFeeSettingsService, FeeSettingsService>();
         services.AddScoped<IBillingPeriodService, BillingPeriodService>();
         services.AddScoped<IFeeChargeService, FeeChargeService>();

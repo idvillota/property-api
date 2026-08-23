@@ -32,6 +32,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<VehicleBrand> VehicleBrands => Set<VehicleBrand>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<Person> People => Set<Person>();
+    public DbSet<UserPersonLink> UserPersonLinks => Set<UserPersonLink>();
     public DbSet<UnitOccupancy> UnitOccupancies => Set<UnitOccupancy>();
     public DbSet<FeeSettings> FeeSettings => Set<FeeSettings>();
     public DbSet<BillingPeriod> BillingPeriods => Set<BillingPeriod>();
@@ -234,6 +235,24 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.Email).HasMaxLength(320);
             e.Property(x => x.Phone).HasMaxLength(40);
             e.HasIndex(x => new { x.TenantId, x.DocumentType, x.DocumentNumber }).IsUnique();
+        });
+
+        modelBuilder.Entity<UserPersonLink>(e =>
+        {
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Person)
+                .WithMany()
+                .HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.UserId })
+                .IsUnique()
+                .HasFilter("\"IsActive\" = TRUE");
+            e.HasIndex(x => new { x.TenantId, x.PersonId })
+                .IsUnique()
+                .HasFilter("\"IsActive\" = TRUE");
         });
 
         modelBuilder.Entity<UnitOccupancy>(e =>
@@ -468,6 +487,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Person>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<UserPersonLink>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<UnitOccupancy>().HasQueryFilter(e =>
