@@ -39,6 +39,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<FeeCharge> FeeCharges => Set<FeeCharge>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
+    public DbSet<PaymentIntent> PaymentIntents => Set<PaymentIntent>();
     public DbSet<CommonArea> CommonAreas => Set<CommonArea>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<ReceptionItem> ReceptionItems => Set<ReceptionItem>();
@@ -347,6 +348,33 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.TenantId, x.PaymentId, x.FeeChargeId }).IsUnique();
         });
 
+        modelBuilder.Entity<PaymentIntent>(e =>
+        {
+            e.Property(x => x.IdempotencyKey).HasMaxLength(120);
+            e.Property(x => x.ProviderRef).HasMaxLength(120);
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.AllocationsJson).HasColumnType("text");
+            e.Property(x => x.FailureReason).HasMaxLength(500);
+            e.HasOne(x => x.HorizontalProperty)
+                .WithMany()
+                .HasForeignKey(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Unit)
+                .WithMany()
+                .HasForeignKey(x => x.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Person)
+                .WithMany()
+                .HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Payment)
+                .WithMany()
+                .HasForeignKey(x => x.PaymentId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.Status, x.CreatedAtUtc });
+        });
+
         modelBuilder.Entity<CommonArea>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(200);
@@ -519,6 +547,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<PaymentAllocation>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<PaymentIntent>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<CommonArea>().HasQueryFilter(e =>

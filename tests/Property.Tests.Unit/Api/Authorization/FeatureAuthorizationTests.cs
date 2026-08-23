@@ -57,6 +57,7 @@ public sealed class FeatureAuthorizationTests
     [InlineData(typeof(BillingPeriodsController), FeatureCodes.BillingCharges)]
     [InlineData(typeof(FeeChargesController), FeatureCodes.BillingCharges)]
     [InlineData(typeof(PaymentsController), FeatureCodes.BillingPayments)]
+    [InlineData(typeof(PaymentIntentsController), FeatureCodes.BillingPayments)]
     [InlineData(typeof(CommonAreasController), FeatureCodes.AmenitiesAreas)]
     [InlineData(typeof(ReservationsController), FeatureCodes.AmenitiesReservations)]
     [InlineData(typeof(ReceptionItemsController), FeatureCodes.ReceptionManage)]

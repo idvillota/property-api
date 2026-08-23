@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<IBillingPeriodService, BillingPeriodService>();
         services.AddScoped<IFeeChargeService, FeeChargeService>();
         services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<IPaymentIntentService, PaymentIntentService>();
         services.AddScoped<ICommonAreaService, CommonAreaService>();
         services.AddScoped<IReservationService, ReservationService>();
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
