@@ -19,6 +19,7 @@ public sealed class AuthService : IAuthService
     private readonly IRolePermissionService _rolePermissions;
     private readonly ICurrentTenantContext _tenantContext;
     private readonly IUserPersonLinkService _userPersonLinks;
+    private readonly ITenantModuleService _tenantModules;
     private readonly PlatformOptions _platform;
 
     public AuthService(
@@ -28,6 +29,7 @@ public sealed class AuthService : IAuthService
         IRolePermissionService rolePermissions,
         ICurrentTenantContext tenantContext,
         IUserPersonLinkService userPersonLinks,
+        ITenantModuleService tenantModules,
         IOptions<PlatformOptions> platform)
     {
         _unitOfWork = unitOfWork;
@@ -36,6 +38,7 @@ public sealed class AuthService : IAuthService
         _rolePermissions = rolePermissions;
         _tenantContext = tenantContext;
         _userPersonLinks = userPersonLinks;
+        _tenantModules = tenantModules;
         _platform = platform.Value;
     }
 
@@ -110,6 +113,7 @@ public sealed class AuthService : IAuthService
         await AssignDefaultRolePermissionsAsync(tenant.Id, roles.Where(r => r.Id != adminRole.Id), cancellationToken);
 
         var permissions = await _rolePermissions.GetPermissionCodesForUserAsync(user.Id, tenant.Id, cancellationToken);
+        var modules = await _tenantModules.GetFlagsAsync(cancellationToken);
         var token = _jwtTokenService.CreateAccessToken(
             user.Id,
             tenant.Id,
@@ -128,6 +132,7 @@ public sealed class AuthService : IAuthService
             IsPlatformAdmin = IsPlatformAdminEmail(user.Email),
             BrandTheme = UserPreferences.NormalizeBrandTheme(tenantUser.BrandTheme),
             ColorScheme = UserPreferences.NormalizeColorScheme(tenantUser.ColorScheme),
+            Modules = modules,
         };
     }
 
@@ -185,6 +190,7 @@ public sealed class AuthService : IAuthService
         _tenantContext.TenantId = membership.TenantId;
         var (personId, unitIds) = await _userPersonLinks.GetPortalScopeAsync(user.Id, cancellationToken);
 
+        var modules = await _tenantModules.GetFlagsAsync(cancellationToken);
         var token = _jwtTokenService.CreateAccessToken(
             user.Id,
             membership.TenantId,
@@ -205,6 +211,7 @@ public sealed class AuthService : IAuthService
             IsPlatformAdmin = IsPlatformAdminEmail(user.Email),
             BrandTheme = UserPreferences.NormalizeBrandTheme(membership.BrandTheme),
             ColorScheme = UserPreferences.NormalizeColorScheme(membership.ColorScheme),
+            Modules = modules,
         };
     }
 

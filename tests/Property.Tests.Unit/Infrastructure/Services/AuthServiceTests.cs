@@ -57,6 +57,9 @@ public sealed class AuthServiceTests
         var links = new Mock<IUserPersonLinkService>();
         links.Setup(l => l.GetPortalScopeAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((null, (IReadOnlyList<Guid>)Array.Empty<Guid>()));
+        var modules = new Mock<ITenantModuleService>();
+        modules.Setup(m => m.GetFlagsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Application.Features.Organization.TenantSettings.TenantModuleFlagsDto());
         return new AuthService(
             fx.UnitOfWork,
             new BcryptPasswordHasher(),
@@ -64,6 +67,7 @@ public sealed class AuthServiceTests
             rolePermissions,
             tenantContext,
             links.Object,
+            modules.Object,
             platform);
     }
 
@@ -86,8 +90,10 @@ public sealed class AuthServiceTests
         Assert.Equal("owner@example.com", result.Email);
         Assert.Single(await fx.Db.Tenants.ToListAsync());
         Assert.Single(await fx.Db.Users.ToListAsync());
-        Assert.Equal(2, await fx.Db.Roles.CountAsync());
+        Assert.Equal(3, await fx.Db.Roles.CountAsync());
         Assert.Single(await fx.Db.TenantUsers.ToListAsync());
+        Assert.NotNull(result.Modules);
+        Assert.True(result.Modules.Portal);
     }
 
     [Fact]

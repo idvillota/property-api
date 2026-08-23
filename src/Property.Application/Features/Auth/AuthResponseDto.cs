@@ -1,3 +1,5 @@
+using Property.Application.Features.Organization.TenantSettings;
+
 namespace Property.Application.Features.Auth;
 
 public sealed class AuthResponseDto
@@ -13,4 +15,6 @@ public sealed class AuthResponseDto
     public bool IsPlatformAdmin { get; set; }
     public string BrandTheme { get; set; } = string.Empty;
     public string ColorScheme { get; set; } = string.Empty;
+    /// <summary>Tenant commercial modules (ARCH-002). Independent of RBAC FeatureCodes.</summary>
+    public TenantModuleFlagsDto Modules { get; set; } = new();
 }

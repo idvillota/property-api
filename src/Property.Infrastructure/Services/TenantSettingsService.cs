@@ -9,27 +9,39 @@ namespace Property.Infrastructure.Services;
 
 /// <summary>
 /// Tenant identity settings mirror the single HorizontalProperty for the tenant.
-/// Dashboard layout JSON remains on TenantSettings.
+/// Dashboard layout JSON and module flags remain on TenantSettings.
 /// </summary>
 public sealed class TenantSettingsService : ITenantSettingsService
 {
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenantContext;
+    private readonly ITenantModuleService _modules;
 
-    public TenantSettingsService(ApplicationDbContext db, ICurrentTenantContext tenantContext)
+    public TenantSettingsService(
+        ApplicationDbContext db,
+        ICurrentTenantContext tenantContext,
+        ITenantModuleService modules)
     {
         _db = db;
         _tenantContext = tenantContext;
+        _modules = modules;
     }
 
     public async Task<TenantSettingsDto> GetAsync(CancellationToken cancellationToken = default)
     {
+        var flags = await _modules.GetFlagsAsync(cancellationToken);
         var property = await _db.HorizontalProperties.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
         if (property is not null)
-            return MapFromProperty(property);
+        {
+            var dto = MapFromProperty(property);
+            dto.Modules = flags;
+            return dto;
+        }
 
-        var settings = await GetOrCreateSettingsAsync(cancellationToken);
-        return Map(settings);
+        var settings = await GetOrCreateSettingsRowAsync(cancellationToken);
+        var empty = Map(settings);
+        empty.Modules = flags;
+        return empty;
     }
 
     public async Task<TenantSettingsDto> UpdateAsync(
@@ -70,11 +82,16 @@ public sealed class TenantSettingsService : ITenantSettingsService
         property.IsActive = dto.IsActive;
         _db.HorizontalProperties.Update(property);
 
-        var settings = await GetOrCreateSettingsAsync(cancellationToken);
+        var settings = await GetOrCreateSettingsRowAsync(cancellationToken);
         ApplyIdentityToSettings(settings, property);
+        if (dto.Modules is not null)
+            TenantModuleService.Apply(settings, dto.Modules);
         _db.TenantSettings.Update(settings);
         await _db.SaveChangesAsync(cancellationToken);
-        return MapFromProperty(property);
+
+        var result = MapFromProperty(property);
+        result.Modules = TenantModuleService.Map(settings);
+        return result;
     }
 
     private static void ApplyIdentityToSettings(TenantSettings settings, HorizontalProperty property)
@@ -91,7 +108,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.Phone = property.Phone;
     }
 
-    private async Task<TenantSettings> GetOrCreateSettingsAsync(CancellationToken cancellationToken)
+    private async Task<TenantSettings> GetOrCreateSettingsRowAsync(CancellationToken cancellationToken)
     {
         var tenantId = ResolveTenantId();
         var settings = await _db.TenantSettings.FirstOrDefaultAsync(s => s.TenantId == tenantId, cancellationToken);
@@ -101,6 +118,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings = new TenantSettings
         {
             TenantId = tenantId,
+            ModulePortalEnabled = true,
         };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);

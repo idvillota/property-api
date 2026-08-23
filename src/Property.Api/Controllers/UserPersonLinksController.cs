@@ -61,6 +61,7 @@ public sealed class UserPersonLinksController : ControllerBase
 
 [ApiController]
 [Authorize]
+[RequireTenantModule(TenantModuleKeys.Portal)]
 [Route("api/portal")]
 public sealed class PortalController : ControllerBase
 {

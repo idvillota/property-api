@@ -27,6 +27,9 @@ public sealed class TenantSettingsDto
     public string? CoefficientBasisNotes { get; set; }
     public bool IsActive { get; set; } = true;
     public bool HasProperty { get; set; }
+
+    /// <summary>Tenant commercial modules (ARCH-002). Independent of user FeatureCodes.</summary>
+    public TenantModuleFlagsDto Modules { get; set; } = new();
 }
 
 public sealed class UpdateTenantSettingsDto
@@ -81,4 +84,7 @@ public sealed class UpdateTenantSettingsDto
     public string? CoefficientBasisNotes { get; set; }
 
     public bool IsActive { get; set; } = true;
+
+    /// <summary>When null, existing module flags are left unchanged.</summary>
+    public TenantModuleFlagsDto? Modules { get; set; }
 }

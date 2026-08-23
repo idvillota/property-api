@@ -20,5 +20,16 @@ public class TenantSettings : ITenantScoped
     /// <summary>JSON layout for tenant dashboard panels (react-grid-layout).</summary>
     public string? DashboardLayoutJson { get; set; }
 
+    /// <summary>Resident/owner portal module (ARCH-002).</summary>
+    public bool ModulePortalEnabled { get; set; } = true;
+
+    public bool ModuleDigitalPaymentsEnabled { get; set; }
+
+    public bool ModuleAccountingEnabled { get; set; }
+
+    public bool ModuleVisitsEnabled { get; set; }
+
+    public bool ModuleAssembliesEnabled { get; set; }
+
     public Tenant Tenant { get; set; } = null!;
 }
