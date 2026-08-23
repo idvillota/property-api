@@ -80,3 +80,61 @@ public sealed class PortalAccountChargeDto
     public DateOnly DueDate { get; set; }
     public FeeChargeStatus Status { get; set; }
 }
+
+/// <summary>COM-014 — common area visible in portal.</summary>
+public sealed class PortalCommonAreaDto
+{
+    public Guid Id { get; set; }
+    public Guid HorizontalPropertyId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public CommonAreaType AreaType { get; set; }
+    public int Capacity { get; set; }
+    public bool RequiresDeposit { get; set; }
+    public decimal? DepositAmount { get; set; }
+    public string? RulesNotes { get; set; }
+    public int? MinDurationMinutes { get; set; }
+    public int? MaxDurationMinutes { get; set; }
+}
+
+public sealed class PortalReservationDto
+{
+    public Guid Id { get; set; }
+    public Guid CommonAreaId { get; set; }
+    public string CommonAreaName { get; set; } = string.Empty;
+    public Guid UnitId { get; set; }
+    public string UnitCode { get; set; } = string.Empty;
+    public DateTime StartsAtUtc { get; set; }
+    public DateTime EndsAtUtc { get; set; }
+    public ReservationStatus Status { get; set; }
+    public int AttendeesCount { get; set; }
+    public string? Notes { get; set; }
+    public bool IsActive { get; set; }
+    public bool CanCancel { get; set; }
+}
+
+public sealed class PortalReservationSlotDto
+{
+    public DateTime StartsAtUtc { get; set; }
+    public DateTime EndsAtUtc { get; set; }
+}
+
+public sealed class CreatePortalReservationDto
+{
+    [System.ComponentModel.DataAnnotations.Required]
+    public Guid CommonAreaId { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Required]
+    public Guid UnitId { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Required]
+    public DateTime StartsAtUtc { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Required]
+    public DateTime EndsAtUtc { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue)]
+    public int AttendeesCount { get; set; } = 1;
+
+    [System.ComponentModel.DataAnnotations.MaxLength(4000)]
+    public string? Notes { get; set; }
+}

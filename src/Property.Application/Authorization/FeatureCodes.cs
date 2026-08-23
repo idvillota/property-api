@@ -27,6 +27,7 @@ public static class FeatureCodes
     public const string AuditView = "audit.view";
     public const string PortalAccess = "portal.access";
     public const string PortalAccountRead = "portal.account.read";
+    public const string PortalReservations = "portal.reservations";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -55,5 +56,6 @@ public static class FeatureCodes
         AuditView,
         PortalAccess,
         PortalAccountRead,
+        PortalReservations,
     ];
 }

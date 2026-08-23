@@ -103,4 +103,124 @@ public sealed class PortalController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    /// <summary>COM-014 — active common areas for portal booking.</summary>
+    [HttpGet("reservas/areas")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalReservations)]
+    public async Task<ActionResult<IReadOnlyList<PortalCommonAreaDto>>> ReservationAreas(
+        CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _portal.ListReservationAreasAsync(userId, cancellationToken));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Person link required for portal access." });
+        }
+    }
+
+    /// <summary>COM-014 — occupied Pending/Confirmed slots for an area (availability).</summary>
+    [HttpGet("reservas/areas/{commonAreaId:guid}/ocupados")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalReservations)]
+    public async Task<ActionResult<IReadOnlyList<PortalReservationSlotDto>>> OccupiedSlots(
+        Guid commonAreaId,
+        [FromQuery] DateTime fromUtc,
+        [FromQuery] DateTime toUtc,
+        CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _portal.ListOccupiedSlotsAsync(userId, commonAreaId, fromUtc, toUtc, cancellationToken));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Person link required for portal access." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>COM-014 — caller's reservations.</summary>
+    [HttpGet("reservas")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalReservations)]
+    public async Task<ActionResult<IReadOnlyList<PortalReservationDto>>> MyReservations(
+        CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _portal.ListMyReservationsAsync(userId, cancellationToken));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Person link required for portal access." });
+        }
+    }
+
+    /// <summary>COM-014 — create reservation for a linked unit.</summary>
+    [HttpPost("reservas")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalReservations)]
+    public async Task<ActionResult<PortalReservationDto>> CreateReservation(
+        [FromBody] CreatePortalReservationDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            var created = await _portal.CreateReservationAsync(userId, dto, cancellationToken);
+            return CreatedAtAction(nameof(MyReservations), created);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>COM-014 — cancel own future reservation (soft-inactive).</summary>
+    [HttpPost("reservas/{id:guid}/cancel")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalReservations)]
+    public async Task<IActionResult> CancelReservation(Guid id, CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            await _portal.CancelReservationAsync(userId, id, cancellationToken);
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

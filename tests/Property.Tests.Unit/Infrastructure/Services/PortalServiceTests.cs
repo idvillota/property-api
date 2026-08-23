@@ -4,6 +4,7 @@ using Property.Api.Authorization;
 using Property.Api.Controllers;
 using Property.Application.Authorization;
 using Property.Application.Features.Organization.UserPersonLinks;
+using Property.Application.Features.Portal;
 using Property.Domain.Entities;
 using Property.Domain.Enums;
 using Property.Infrastructure.Authorization;
@@ -16,7 +17,19 @@ namespace Property.Tests.Unit.Infrastructure.Services;
 
 public sealed class PortalServiceTests
 {
-    private static async Task<(User user, Person person, DomainUnit unit, DomainUnit otherUnit)> SeedLinkedAsync(
+    private static PortalService CreateSut(TenantDbFixture fx) =>
+        new(
+            fx.Db,
+            new UserPersonLinkService(fx.UnitOfWork, fx.Db, fx.TenantContext),
+            new ReservationService(
+                fx.Repository<Reservation>(),
+                fx.Repository<CommonArea>(),
+                fx.Repository<DomainUnit>(),
+                fx.Repository<Person>(),
+                fx.Repository<HorizontalProperty>(),
+                fx.UnitOfWork));
+
+    private static async Task<(User user, Person person, DomainUnit unit, DomainUnit otherUnit, HorizontalProperty property)> SeedLinkedAsync(
         TenantDbFixture fx)
     {
         var user = new User
@@ -81,14 +94,14 @@ public sealed class PortalServiceTests
 
         var links = new UserPersonLinkService(fx.UnitOfWork, fx.Db, fx.TenantContext);
         await links.LinkAsync(person.Id, new LinkUserToPersonDto { UserId = user.Id });
-        return (user, person, unit, otherUnit);
+        return (user, person, unit, otherUnit, property);
     }
 
     [Fact]
     public async Task PortalAuth_IssuesUnitClaims()
     {
         using var fx = new TenantDbFixture();
-        var (user, person, unit, _) = await SeedLinkedAsync(fx);
+        var (user, person, unit, _, _) = await SeedLinkedAsync(fx);
         var links = new UserPersonLinkService(fx.UnitOfWork, fx.Db, fx.TenantContext);
         var (personId, unitIds) = await links.GetPortalScopeAsync(user.Id);
 
@@ -122,8 +135,8 @@ public sealed class PortalServiceTests
     public async Task PortalApi_ScopesToLinkedUnits()
     {
         using var fx = new TenantDbFixture();
-        var (user, _, unit, otherUnit) = await SeedLinkedAsync(fx);
-        var sut = new PortalService(fx.Db, new UserPersonLinkService(fx.UnitOfWork, fx.Db, fx.TenantContext));
+        var (user, _, unit, otherUnit, _) = await SeedLinkedAsync(fx);
+        var sut = CreateSut(fx);
 
         var home = await sut.GetHomeAsync(user.Id);
 
@@ -138,7 +151,7 @@ public sealed class PortalServiceTests
     public async Task PortalAccount_ReturnsOnlyLinkedUnits()
     {
         using var fx = new TenantDbFixture();
-        var (user, person, unit, otherUnit) = await SeedLinkedAsync(fx);
+        var (user, person, unit, otherUnit, _) = await SeedLinkedAsync(fx);
 
         var period = new BillingPeriod
         {
@@ -193,7 +206,7 @@ public sealed class PortalServiceTests
         });
         await fx.Db.SaveChangesAsync();
 
-        var sut = new PortalService(fx.Db, new UserPersonLinkService(fx.UnitOfWork, fx.Db, fx.TenantContext));
+        var sut = CreateSut(fx);
         var account = await sut.GetAccountAsync(user.Id);
 
         Assert.Single(account.Units);
@@ -226,9 +239,94 @@ public sealed class PortalServiceTests
         fx.Db.TenantUsers.Add(new TenantUser { Id = Guid.NewGuid(), UserId = user.Id, IsActive = true });
         await fx.Db.SaveChangesAsync();
 
-        var sut = new PortalService(fx.Db, new UserPersonLinkService(fx.UnitOfWork, fx.Db, fx.TenantContext));
+        var sut = CreateSut(fx);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => sut.GetAccountAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task PortalReservation_Creates_WhenFree()
+    {
+        using var fx = new TenantDbFixture();
+        var (user, person, unit, _, property) = await SeedLinkedAsync(fx);
+        var area = new CommonArea
+        {
+            Id = Guid.NewGuid(),
+            HorizontalPropertyId = property.Id,
+            Name = "Salón social",
+            AreaType = CommonAreaType.SocialRoom,
+            Capacity = 20,
+            IsActive = true,
+            MinDurationMinutes = 60,
+            MaxDurationMinutes = 240,
+        };
+        fx.Db.CommonAreas.Add(area);
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx);
+        var start = DateTime.UtcNow.AddDays(2).Date.AddHours(14);
+        var created = await sut.CreateReservationAsync(
+            user.Id,
+            new CreatePortalReservationDto
+            {
+                CommonAreaId = area.Id,
+                UnitId = unit.Id,
+                StartsAtUtc = start,
+                EndsAtUtc = start.AddHours(2),
+                AttendeesCount = 4,
+            });
+
+        Assert.Equal(person.Id, (await fx.Db.Reservations.SingleAsync()).PersonId);
+        Assert.Equal(unit.Id, created.UnitId);
+        Assert.Equal(ReservationStatus.Confirmed, created.Status);
+        Assert.True(created.IsActive);
+        Assert.True(created.CanCancel);
+    }
+
+    [Fact]
+    public async Task PortalReservation_RejectsOverlap()
+    {
+        using var fx = new TenantDbFixture();
+        var (user, _, unit, _, property) = await SeedLinkedAsync(fx);
+        var area = new CommonArea
+        {
+            Id = Guid.NewGuid(),
+            HorizontalPropertyId = property.Id,
+            Name = "Piscina",
+            AreaType = CommonAreaType.Pool,
+            Capacity = 10,
+            IsActive = true,
+        };
+        fx.Db.CommonAreas.Add(area);
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx);
+        var start = DateTime.UtcNow.AddDays(3).Date.AddHours(10);
+        var dto = new CreatePortalReservationDto
+        {
+            CommonAreaId = area.Id,
+            UnitId = unit.Id,
+            StartsAtUtc = start,
+            EndsAtUtc = start.AddHours(2),
+            AttendeesCount = 2,
+        };
+
+        await sut.CreateReservationAsync(user.Id, dto);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.CreateReservationAsync(
+                user.Id,
+                new CreatePortalReservationDto
+                {
+                    CommonAreaId = area.Id,
+                    UnitId = unit.Id,
+                    StartsAtUtc = start.AddHours(1),
+                    EndsAtUtc = start.AddHours(3),
+                    AttendeesCount = 1,
+                }));
+
+        Assert.Contains("reserva", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, await fx.Db.Reservations.CountAsync());
     }
 
     [Fact]
