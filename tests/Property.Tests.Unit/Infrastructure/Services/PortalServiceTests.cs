@@ -44,6 +44,13 @@ public sealed class PortalServiceTests
                     UseMockCheckout = true,
                     PortalPublicBaseUrl = "http://localhost:5173",
                 }));
+        var mural = new MuralPostService(
+            fx.Repository<MuralPost>(),
+            fx.Repository<HorizontalProperty>(),
+            fx.Repository<DomainUnit>(),
+            fx.Repository<User>(),
+            fx.TenantContext,
+            fx.UnitOfWork);
 
         return new PortalService(
             fx.Db,
@@ -56,7 +63,8 @@ public sealed class PortalServiceTests
                 fx.Repository<HorizontalProperty>(),
                 fx.UnitOfWork),
             intents,
-            checkout);
+            checkout,
+            mural);
     }
 
     private static async Task<(User user, Person person, DomainUnit unit, DomainUnit otherUnit, HorizontalProperty property)> SeedLinkedAsync(

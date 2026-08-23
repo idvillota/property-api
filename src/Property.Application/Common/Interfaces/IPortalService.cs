@@ -1,4 +1,5 @@
 using Property.Application.Features.Billing.PaymentIntents;
+using Property.Application.Features.Community.Mural;
 using Property.Application.Features.Organization.UserPersonLinks;
 using Property.Application.Features.Portal;
 
@@ -40,6 +41,10 @@ public interface IPortalService
     Task CancelReservationAsync(
         Guid userId,
         Guid reservationId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MuralPostDto>> ListMuralPostsAsync(
+        Guid userId,
         CancellationToken cancellationToken = default);
 
     Task<PortalCheckoutDto> StartPaymentAsync(

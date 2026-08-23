@@ -51,6 +51,36 @@ public sealed class MuralPostService : IMuralPostService
             },
             cancellationToken);
 
+    public async Task<IReadOnlyList<MuralPostDto>> ListPublicAsync(
+        Guid? horizontalPropertyId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var query = _posts.Query().AsNoTracking()
+            .Where(e =>
+                e.IsActive &&
+                !e.IsHidden &&
+                (e.ExpiresAtUtc == null || e.ExpiresAtUtc >= now));
+
+        if (horizontalPropertyId.HasValue)
+            query = query.Where(e => e.HorizontalPropertyId == horizontalPropertyId.Value);
+
+        var entities = await query
+            .OrderByDescending(e => e.IsPinned)
+            .ThenByDescending(e => e.PublishedAtUtc)
+            .Take(100)
+            .ToListAsync(cancellationToken);
+
+        var unitIds = entities.Where(e => e.UnitId.HasValue).Select(e => e.UnitId!.Value).Distinct().ToList();
+        var unitCodes = unitIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _units.Query().AsNoTracking()
+                .Where(u => unitIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => u.Code, cancellationToken);
+
+        return entities.Select(e => Map(e, unitCodes)).ToList();
+    }
+
     public async Task<MuralPostDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var entity = await _posts.Query().AsNoTracking().FirstOrDefaultAsync(e => e.Id == id, cancellationToken);

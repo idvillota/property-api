@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Property.Application.Common.Interfaces;
 using Property.Application.Features.Amenities.Reservations;
 using Property.Application.Features.Billing.PaymentIntents;
+using Property.Application.Features.Community.Mural;
 using Property.Application.Features.Organization.UserPersonLinks;
 using Property.Application.Features.Portal;
 using Property.Domain.Enums;
@@ -16,19 +17,22 @@ public sealed class PortalService : IPortalService
     private readonly IReservationService _reservations;
     private readonly IPaymentIntentService _paymentIntents;
     private readonly IPspCheckoutService _pspCheckout;
+    private readonly IMuralPostService _mural;
 
     public PortalService(
         ApplicationDbContext db,
         IUserPersonLinkService links,
         IReservationService reservations,
         IPaymentIntentService paymentIntents,
-        IPspCheckoutService pspCheckout)
+        IPspCheckoutService pspCheckout,
+        IMuralPostService mural)
     {
         _db = db;
         _links = links;
         _reservations = reservations;
         _paymentIntents = paymentIntents;
         _pspCheckout = pspCheckout;
+        _mural = mural;
     }
 
     public Task<PortalMeDto> GetMeAsync(Guid userId, CancellationToken cancellationToken = default) =>
@@ -77,7 +81,7 @@ public sealed class PortalService : IPortalService
                 new PortalQuickLinkDto { Id = "cuenta", Label = "Cuenta", Path = "/portal/cuenta", Available = true },
                 new PortalQuickLinkDto { Id = "pagar", Label = "Pagar", Path = "/portal/cuenta/pagar", Available = true },
                 new PortalQuickLinkDto { Id = "reservas", Label = "Reservas", Path = "/portal/reservas", Available = true },
-                new PortalQuickLinkDto { Id = "mural", Label = "Mural", Path = "/portal/mural", Available = false },
+                new PortalQuickLinkDto { Id = "mural", Label = "Mural", Path = "/portal/mural", Available = true },
                 new PortalQuickLinkDto { Id = "pqrs", Label = "PQRS", Path = "/portal/pqrs", Available = false },
             ],
         };
@@ -370,6 +374,14 @@ public sealed class PortalService : IPortalService
         entity.Status = ReservationStatus.Cancelled;
         entity.IsActive = false;
         await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<MuralPostDto>> ListMuralPostsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        _ = await _links.GetPortalMeAsync(userId, cancellationToken);
+        return await _mural.ListPublicAsync(cancellationToken: cancellationToken);
     }
 
     public async Task<PortalCheckoutDto> StartPaymentAsync(

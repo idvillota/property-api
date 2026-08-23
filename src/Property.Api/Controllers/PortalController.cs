@@ -4,6 +4,7 @@ using Property.Api.Authorization;
 using Property.Application.Authorization;
 using Property.Application.Common.Interfaces;
 using Property.Application.Features.Billing.PaymentIntents;
+using Property.Application.Features.Community.Mural;
 using Property.Application.Features.Organization.UserPersonLinks;
 using Property.Application.Features.Portal;
 
@@ -222,6 +223,25 @@ public sealed class PortalController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>COM-003 — portal mural feed (active posts only).</summary>
+    [HttpGet("mural")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalMuralRead)]
+    public async Task<ActionResult<IReadOnlyList<MuralPostDto>>> ListMural(CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _portal.ListMuralPostsAsync(userId, cancellationToken));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Person link required for portal access." });
         }
     }
 

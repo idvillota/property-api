@@ -29,6 +29,7 @@ public static class FeatureCodes
     public const string PortalAccountRead = "portal.account.read";
     public const string PortalReservations = "portal.reservations";
     public const string PortalPay = "portal.pay";
+    public const string PortalMuralRead = "portal.mural.read";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -59,5 +60,6 @@ public static class FeatureCodes
         PortalAccountRead,
         PortalReservations,
         PortalPay,
+        PortalMuralRead,
     ];
 }
