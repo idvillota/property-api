@@ -73,6 +73,7 @@ public static class DependencyInjection
         services.AddScoped<IOutboxMessageHandler, EmailSendOutboxHandler>();
         services.AddScoped<IReceptionNotificationService, ReceptionNotificationService>();
         services.AddScoped<IReceptionItemService, ReceptionItemService>();
+        services.AddScoped<IVisitLogService, VisitLogService>();
         services.AddScoped<IMuralPostService, MuralPostService>();
         services.AddScoped<IReportService, ReportService>();
 

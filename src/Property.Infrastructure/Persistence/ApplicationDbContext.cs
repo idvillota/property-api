@@ -43,6 +43,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<CommonArea> CommonAreas => Set<CommonArea>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<ReceptionItem> ReceptionItems => Set<ReceptionItem>();
+    public DbSet<VisitLog> VisitLogs => Set<VisitLog>();
     public DbSet<MuralPost> MuralPosts => Set<MuralPost>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<FileAsset> FileAssets => Set<FileAsset>();
@@ -451,6 +452,30 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.TenantId, x.UnitId, x.Status });
         });
 
+        modelBuilder.Entity<VisitLog>(e =>
+        {
+            e.Property(x => x.Notes).HasMaxLength(1000);
+            e.HasOne(x => x.HorizontalProperty)
+                .WithMany()
+                .HasForeignKey(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Unit)
+                .WithMany()
+                .HasForeignKey(x => x.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.VisitorPerson)
+                .WithMany()
+                .HasForeignKey(x => x.VisitorPersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.RegisteredByUser)
+                .WithMany()
+                .HasForeignKey(x => x.RegisteredByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.EnteredAtUtc });
+            e.HasIndex(x => new { x.TenantId, x.UnitId, x.EnteredAtUtc });
+            e.HasIndex(x => x.VisitorPersonId);
+        });
+
         modelBuilder.Entity<MuralPost>(e =>
         {
             e.Property(x => x.Title).HasMaxLength(200);
@@ -590,6 +615,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<ReceptionItem>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<VisitLog>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<MuralPost>().HasQueryFilter(e =>

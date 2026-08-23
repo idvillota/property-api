@@ -70,4 +70,14 @@ public sealed class FeatureAuthorizationTests
         Assert.NotNull(attribute);
         Assert.Equal(FeatureAuthorizationPolicies.For(featureCode), attribute!.Policy);
     }
+
+    [Fact]
+    public void VisitLogsController_allows_manage_or_visits()
+    {
+        var attribute = typeof(VisitLogsController).GetCustomAttribute<RequireAnyFeatureAttribute>();
+        Assert.NotNull(attribute);
+        Assert.Contains(FeatureCodes.ReceptionManage, attribute!.FeatureCodes);
+        Assert.Contains(FeatureCodes.ReceptionVisits, attribute.FeatureCodes);
+        Assert.Equal(2, attribute.FeatureCodes.Count);
+    }
 }

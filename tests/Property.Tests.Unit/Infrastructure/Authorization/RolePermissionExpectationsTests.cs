@@ -43,9 +43,10 @@ public sealed class RolePermissionExpectationsTests
     public void Receptionist_role_is_limited_to_reception_and_dashboard()
     {
         var permissions = Permissions(SystemRoles.Receptionist);
-        Assert.Equal(2, permissions.Count);
+        Assert.Equal(3, permissions.Count);
         Assert.Contains(FeatureCodes.DashboardView, permissions);
         Assert.Contains(FeatureCodes.ReceptionManage, permissions);
+        Assert.Contains(FeatureCodes.ReceptionVisits, permissions);
         Assert.DoesNotContain(FeatureCodes.BillingPayments, permissions);
     }
 

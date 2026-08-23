@@ -21,6 +21,7 @@ public static class FeatureCodes
     public const string AmenitiesAreas = "amenities.areas";
     public const string AmenitiesReservations = "amenities.reservations";
     public const string ReceptionManage = "reception.manage";
+    public const string ReceptionVisits = "reception.visits";
     public const string MuralManage = "mural.manage";
     public const string ReportsView = "reports.view";
     public const string AuditView = "audit.view";
@@ -47,6 +48,7 @@ public static class FeatureCodes
         AmenitiesAreas,
         AmenitiesReservations,
         ReceptionManage,
+        ReceptionVisits,
         MuralManage,
         ReportsView,
         AuditView,
