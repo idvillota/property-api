@@ -107,7 +107,8 @@ public sealed class AccountingModuleTests
             fx.Repository<Person>(),
             fx.UnitOfWork,
             new AuditWriter(fx.Db, fx.TenantContext),
-            outbox);
+            outbox,
+            new NullWebhookPublisher());
 
         var payment = await payments.CreateAsync(new CreatePaymentDto
         {
@@ -427,7 +428,8 @@ public sealed class AccountingModuleTests
             fx.Repository<Person>(),
             fx.UnitOfWork,
             new AuditWriter(fx.Db, fx.TenantContext),
-            outbox);
+            outbox,
+            new NullWebhookPublisher());
         var payment = await payments.CreateAsync(new CreatePaymentDto
         {
             HorizontalPropertyId = seed.Property.Id,

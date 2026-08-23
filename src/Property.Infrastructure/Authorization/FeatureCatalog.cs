@@ -57,6 +57,8 @@ public static class FeatureCatalog
         new(Guid.Parse("f100004a-0050-4050-8050-00000000004a"), FeatureCodes.PollsManage, "Community polls", "Community", 590),
         new(Guid.Parse("f100004b-0051-4051-8051-00000000004b"), FeatureCodes.PortalLibrary, "Portal library", "Portal", 50),
         new(Guid.Parse("f100004c-0052-4052-8052-00000000004c"), FeatureCodes.PortalPolls, "Portal polls", "Portal", 55),
+        new(Guid.Parse("f100004d-0053-4053-8053-00000000004d"), FeatureCodes.AiOps, "AI operation assistant", "Community", 595),
+        new(Guid.Parse("f100004e-0054-4054-8054-00000000004e"), FeatureCodes.PlatformApi, "Platform API and webhooks", "Administration", 180),
     ];
 
     public static IReadOnlyDictionary<string, Guid> IdsByCode { get; } =

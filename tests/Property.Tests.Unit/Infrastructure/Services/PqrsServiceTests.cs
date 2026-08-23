@@ -23,7 +23,8 @@ public sealed class PqrsServiceTests
             new OutboxWriter(
                 fx.Db,
                 fx.TenantContext,
-                Microsoft.Extensions.Options.Options.Create(new OutboxOptions())));
+                Microsoft.Extensions.Options.Options.Create(new OutboxOptions())),
+            new NullWebhookPublisher());
 
     private static async Task<(
         HorizontalProperty Property,
@@ -223,7 +224,8 @@ public sealed class PqrsServiceTests
                 fx.Db,
                 fx.TenantContext,
                 Microsoft.Extensions.Options.Options.Create(
-                    new Property.Application.Common.Options.OutboxOptions())));
+                    new Property.Application.Common.Options.OutboxOptions())),
+            new NullWebhookPublisher());
         var intents = new PaymentIntentService(
             fx.Db,
             payments,
@@ -260,7 +262,8 @@ public sealed class PqrsServiceTests
                 fx.Db,
                 fx.TenantContext,
                 Microsoft.Extensions.Options.Options.Create(new OutboxOptions())),
-            new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext));
+            new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext),
+            new NullWebhookPublisher());
 
         return new PortalService(
             fx.Db,

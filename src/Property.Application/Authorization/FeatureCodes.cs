@@ -51,6 +51,8 @@ public static class FeatureCodes
     public const string PollsManage = "polls.manage";
     public const string PortalLibrary = "portal.library";
     public const string PortalPolls = "portal.polls";
+    public const string AiOps = "ai.ops";
+    public const string PlatformApi = "platform.api";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -103,6 +105,8 @@ public static class FeatureCodes
         PollsManage,
         PortalLibrary,
         PortalPolls,
+        AiOps,
+        PlatformApi,
     ];
 
     public static IReadOnlyList<string> AccountingAll { get; } =

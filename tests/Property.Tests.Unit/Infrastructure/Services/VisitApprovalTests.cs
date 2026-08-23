@@ -21,7 +21,8 @@ public sealed class VisitApprovalTests
             fx.TenantContext,
             fx.UnitOfWork,
             new OutboxWriter(fx.Db, fx.TenantContext, Microsoft.Extensions.Options.Options.Create(new OutboxOptions())),
-            new AuditWriter(fx.Db, fx.TenantContext));
+            new AuditWriter(fx.Db, fx.TenantContext),
+            new NullWebhookPublisher());
 
     private static async Task<(HorizontalProperty Property, DomainUnit Unit, Person Occupant)> SeedAsync(
         TenantDbFixture fx)

@@ -19,19 +19,22 @@ public sealed class VisitLogService : IVisitLogService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IOutboxWriter _outbox;
     private readonly IAuditWriter _audit;
+    private readonly IWebhookPublisher _webhooks;
 
     public VisitLogService(
         ApplicationDbContext db,
         ICurrentTenantContext tenant,
         IUnitOfWork unitOfWork,
         IOutboxWriter outbox,
-        IAuditWriter audit)
+        IAuditWriter audit,
+        IWebhookPublisher webhooks)
     {
         _db = db;
         _tenant = tenant;
         _unitOfWork = unitOfWork;
         _outbox = outbox;
         _audit = audit;
+        _webhooks = webhooks;
     }
 
     public async Task<PagedResult<VisitLogDto>> ListAsync(
@@ -166,6 +169,7 @@ public sealed class VisitLogService : IVisitLogService
         await ExpireOverdueAsync(cancellationToken);
         var visit = await LoadPendingForDecisionAsync(visitId, personId, cancellationToken);
         ApplyDecision(visit, VisitLogStatus.Approved, personId, userId, overrideReason: null);
+        await EnqueueVisitApprovedWebhookAsync(visit, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return (await GetByIdAsync(visitId, cancellationToken))!;
     }
@@ -203,6 +207,8 @@ public sealed class VisitLogService : IVisitLogService
 
         var before = new { visit.Status, visit.OverrideReason };
         ApplyDecision(visit, VisitLogStatus.Approved, personId: null, userId, reason.Trim());
+
+        await EnqueueVisitApprovedWebhookAsync(visit, cancellationToken);
 
         await _audit.WriteAsync(
             AuditEntityTypes.VisitLog,
@@ -307,22 +313,79 @@ public sealed class VisitLogService : IVisitLogService
         var visitorName = $"{visitor.FirstName} {visitor.LastName}".Trim();
         foreach (var person in contacts.DistinctBy(p => p.Id))
         {
-            await _outbox.EnqueueAsync(
-                OutboxMessageTypes.EmailSend,
-                new EmailSendPayload
-                {
-                    ToEmail = person.Email!,
-                    Subject = $"Visita pendiente de aprobación — unidad {unit.Code}",
-                    HtmlBody =
-                        $"""
-                        <p>Hola {System.Net.WebUtility.HtmlEncode($"{person.FirstName} {person.LastName}".Trim())},</p>
-                        <p>Hay una visita pendiente de aprobación para la unidad <strong>{System.Net.WebUtility.HtmlEncode(unit.Code)}</strong>.</p>
-                        <p>Visitante: <strong>{System.Net.WebUtility.HtmlEncode(visitorName)}</strong>.</p>
-                        <p>Aprueba o rechaza desde el portal en <strong>/portal/visitas</strong>.</p>
-                        """,
-                },
-                cancellationToken);
+            if (!string.IsNullOrWhiteSpace(person.Email))
+            {
+                await _outbox.EnqueueAsync(
+                    OutboxMessageTypes.EmailSend,
+                    new EmailSendPayload
+                    {
+                        ToEmail = person.Email!,
+                        Subject = $"Visita pendiente de aprobación — unidad {unit.Code}",
+                        HtmlBody =
+                            $"""
+                            <p>Hola {System.Net.WebUtility.HtmlEncode($"{person.FirstName} {person.LastName}".Trim())},</p>
+                            <p>Hay una visita pendiente de aprobación para la unidad <strong>{System.Net.WebUtility.HtmlEncode(unit.Code)}</strong>.</p>
+                            <p>Visitante: <strong>{System.Net.WebUtility.HtmlEncode(visitorName)}</strong>.</p>
+                            <p>Aprueba o rechaza desde el portal en <strong>/portal/visitas</strong>.</p>
+                            """,
+                    },
+                    cancellationToken);
+            }
+
+            if (person.WhatsAppOptIn && !string.IsNullOrWhiteSpace(person.Phone))
+            {
+                await _outbox.EnqueueAsync(
+                    OutboxMessageTypes.WhatsAppSend,
+                    new WhatsAppSendPayload
+                    {
+                        ToPhone = person.Phone!.Trim(),
+                        Body =
+                            $"Visita pendiente de aprobación — unidad {unit.Code}. " +
+                            $"Visitante: {visitorName}. Aprueba o rechaza en /portal/visitas.",
+                        TemplateKey = "visit",
+                    },
+                    cancellationToken);
+
+                var pendingOutbox = _db.ChangeTracker.Entries<OutboxMessage>()
+                    .Where(e => e.State == EntityState.Added)
+                    .Select(e => e.Entity)
+                    .OrderByDescending(e => e.CreatedAtUtc)
+                    .FirstOrDefault();
+
+                await _db.NotificationLogs.AddAsync(
+                    new NotificationLog
+                    {
+                        Id = Guid.NewGuid(),
+                        HorizontalPropertyId = log.HorizontalPropertyId,
+                        PersonId = person.Id,
+                        UnitId = log.UnitId,
+                        Channel = "whatsapp",
+                        Purpose = "visit",
+                        ToAddress = person.Phone!.Trim(),
+                        TemplateKey = "visit",
+                        OutboxMessageId = pendingOutbox?.Id,
+                        SentAtUtc = DateTime.UtcNow,
+                    },
+                    cancellationToken);
+            }
         }
+    }
+
+    private async Task EnqueueVisitApprovedWebhookAsync(
+        VisitLog visit,
+        CancellationToken cancellationToken)
+    {
+        await _webhooks.EnqueueEventAsync(
+            WebhookEventTypes.VisitApproved,
+            new
+            {
+                visitId = visit.Id,
+                horizontalPropertyId = visit.HorizontalPropertyId,
+                unitId = visit.UnitId,
+                visitorPersonId = visit.VisitorPersonId,
+                decidedAtUtc = visit.DecidedAtUtc,
+            },
+            cancellationToken);
     }
 
     private static string NormalizeDocument(string value) =>

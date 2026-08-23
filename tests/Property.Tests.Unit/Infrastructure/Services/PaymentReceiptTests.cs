@@ -114,7 +114,8 @@ public sealed class PaymentReceiptTests
             fx.Repository<Person>(),
             fx.UnitOfWork,
             new AuditWriter(fx.Db, fx.TenantContext),
-            outbox);
+            outbox,
+            new NullWebhookPublisher());
         var receipts = new PaymentReceiptService(fx.Db, files, outbox, fx.UnitOfWork);
         return (payments, receipts, root);
     }

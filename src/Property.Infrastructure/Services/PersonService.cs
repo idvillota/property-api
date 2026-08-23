@@ -47,6 +47,7 @@ public sealed class PersonService : IPersonService
             LastName = dto.LastName.Trim(),
             Email = dto.Email?.Trim(),
             Phone = dto.Phone?.Trim(),
+            WhatsAppOptIn = dto.WhatsAppOptIn,
             IsActive = true,
         };
         await _people.AddAsync(entity, cancellationToken);
@@ -66,6 +67,7 @@ public sealed class PersonService : IPersonService
         entity.LastName = dto.LastName.Trim();
         entity.Email = dto.Email?.Trim();
         entity.Phone = dto.Phone?.Trim();
+        entity.WhatsAppOptIn = dto.WhatsAppOptIn;
         entity.IsActive = dto.IsActive;
         _people.Update(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -211,6 +213,7 @@ public sealed class PersonService : IPersonService
             LastName = entity.LastName,
             Email = entity.Email,
             Phone = entity.Phone,
+            WhatsAppOptIn = entity.WhatsAppOptIn,
             IsActive = entity.IsActive,
         };
 }

@@ -35,7 +35,7 @@ public sealed class TenantModuleServiceTests
     }
 
     [Fact]
-    public async Task ModuleFlag_Accounting_IndependentOfAssemblies()
+    public async Task ModuleFlag_Accounting_Independent()
     {
         using var fx = new TenantDbFixture();
         var sut = new TenantModuleService(fx.Db, fx.TenantContext, new ChartOfAccountsService(fx.Db, fx.TenantContext));

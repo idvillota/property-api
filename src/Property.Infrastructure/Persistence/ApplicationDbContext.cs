@@ -86,6 +86,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<Poll> Polls => Set<Poll>();
     public DbSet<PollOption> PollOptions => Set<PollOption>();
     public DbSet<PollVote> PollVotes => Set<PollVote>();
+    public DbSet<NotificationLog> NotificationLogs => Set<NotificationLog>();
+    public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -193,8 +195,7 @@ public sealed class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.NeighborhoodId)
                 .OnDelete(DeleteBehavior.Restrict);
-            // Colombia model: one SaaS tenant administers exactly one horizontal property.
-            e.HasIndex(x => x.TenantId).IsUnique();
+            e.HasIndex(x => x.TenantId);
         });
 
         modelBuilder.Entity<Building>(e =>
@@ -786,6 +787,25 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.PollId, x.PersonId });
         });
 
+        modelBuilder.Entity<NotificationLog>(e =>
+        {
+            e.Property(x => x.Channel).HasMaxLength(40);
+            e.Property(x => x.Purpose).HasMaxLength(40);
+            e.Property(x => x.ToAddress).HasMaxLength(320);
+            e.Property(x => x.TemplateKey).HasMaxLength(80);
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.SentAtUtc });
+            e.HasIndex(x => new { x.TenantId, x.PersonId, x.SentAtUtc });
+        });
+
+        modelBuilder.Entity<WebhookSubscription>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(120);
+            e.Property(x => x.TargetUrl).HasMaxLength(500);
+            e.Property(x => x.Secret).HasMaxLength(200);
+            e.Property(x => x.EventTypes).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.IsActive });
+        });
+
         modelBuilder.Entity<LedgerAccount>(e =>
         {
             e.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
@@ -1075,6 +1095,12 @@ public sealed class ApplicationDbContext : DbContext
         modelBuilder.Entity<PollOption>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
         modelBuilder.Entity<PollVote>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<NotificationLog>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<WebhookSubscription>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
     }
 

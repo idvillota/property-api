@@ -97,11 +97,18 @@ public sealed class DunningJobService : IDunningJobService
             from o in _db.UnitOccupancies.AsNoTracking()
             join p in _db.People.AsNoTracking() on o.PersonId equals p.Id
             where unitIds.Contains(o.UnitId) && o.IsActive && o.IsCommunicationResponsible
-            select new { o.UnitId, PersonId = p.Id, p.Email, Name = (p.FirstName + " " + p.LastName).Trim() }
+            select new
+            {
+                o.UnitId,
+                PersonId = p.Id,
+                p.Email,
+                p.Phone,
+                p.WhatsAppOptIn,
+                Name = (p.FirstName + " " + p.LastName).Trim(),
+            }
         ).ToListAsync(cancellationToken);
 
         var contactByUnit = contacts
-            .Where(c => !string.IsNullOrWhiteSpace(c.Email))
             .GroupBy(c => c.UnitId)
             .ToDictionary(g => g.Key, g => g.First());
 
@@ -129,6 +136,11 @@ public sealed class DunningJobService : IDunningJobService
             if (!contactByUnit.TryGetValue(unit.UnitId, out var contact))
                 continue;
 
+            var hasEmail = !string.IsNullOrWhiteSpace(contact.Email);
+            var hasWhatsApp = contact.WhatsAppOptIn && !string.IsNullOrWhiteSpace(contact.Phone);
+            if (!hasEmail && !hasWhatsApp)
+                continue;
+
             unitCodes.TryGetValue(unit.UnitId, out var code);
             code ??= unit.UnitId.ToString("N")[..8];
 
@@ -145,22 +157,59 @@ public sealed class DunningJobService : IDunningJobService
                 unit.Balance,
                 unit.DaysOverdue);
 
-            await _outbox.EnqueueAsync(
-                OutboxMessageTypes.EmailSend,
-                new EmailSendPayload
-                {
-                    ToEmail = contact.Email!.Trim(),
-                    Subject = subject,
-                    HtmlBody = body,
-                },
-                cancellationToken);
+            Guid? emailOutboxId = null;
+            if (hasEmail)
+            {
+                await _outbox.EnqueueAsync(
+                    OutboxMessageTypes.EmailSend,
+                    new EmailSendPayload
+                    {
+                        ToEmail = contact.Email!.Trim(),
+                        Subject = subject,
+                        HtmlBody = body,
+                    },
+                    cancellationToken);
+                emailOutboxId = GetLatestPendingOutboxId();
+            }
 
-            // Outbox row is tracked but not yet saved — capture id after we add log with same SaveChanges.
-            var pendingOutbox = _db.ChangeTracker.Entries<OutboxMessage>()
-                .Where(e => e.State == EntityState.Added)
-                .Select(e => e.Entity)
-                .OrderByDescending(e => e.CreatedAtUtc)
-                .FirstOrDefault();
+            Guid? whatsAppOutboxId = null;
+            if (hasWhatsApp)
+            {
+                await _outbox.EnqueueAsync(
+                    OutboxMessageTypes.WhatsAppSend,
+                    new WhatsAppSendPayload
+                    {
+                        ToPhone = contact.Phone!.Trim(),
+                        Body = StripHtml(body),
+                        TemplateKey = "dunning",
+                    },
+                    cancellationToken);
+                whatsAppOutboxId = GetLatestPendingOutboxId();
+
+                await _db.NotificationLogs.AddAsync(
+                    new NotificationLog
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = rule.TenantId,
+                        HorizontalPropertyId = rule.HorizontalPropertyId,
+                        PersonId = contact.PersonId,
+                        UnitId = unit.UnitId,
+                        Channel = "whatsapp",
+                        Purpose = "dunning",
+                        ToAddress = contact.Phone!.Trim(),
+                        TemplateKey = "dunning",
+                        OutboxMessageId = whatsAppOutboxId,
+                        SentAtUtc = DateTime.UtcNow,
+                    },
+                    cancellationToken);
+            }
+
+            if (!hasEmail)
+            {
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                count++;
+                continue;
+            }
 
             var log = new DunningSendLog
             {
@@ -170,11 +219,11 @@ public sealed class DunningJobService : IDunningJobService
                 UnitId = unit.UnitId,
                 DunningRuleId = rule.Id,
                 PersonId = contact.PersonId,
-                ToEmail = contact.Email.Trim(),
+                ToEmail = contact.Email!.Trim(),
                 DaysOverdueSnapshot = unit.DaysOverdue,
                 BalanceSnapshot = unit.Balance,
                 SentAtUtc = DateTime.UtcNow,
-                OutboxMessageId = pendingOutbox?.Id,
+                OutboxMessageId = emailOutboxId,
             };
             await _db.DunningSendLogs.AddAsync(log, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -183,6 +232,17 @@ public sealed class DunningJobService : IDunningJobService
 
         return count;
     }
+
+    private Guid? GetLatestPendingOutboxId() =>
+        _db.ChangeTracker.Entries<OutboxMessage>()
+            .Where(e => e.State == EntityState.Added)
+            .Select(e => e.Entity)
+            .OrderByDescending(e => e.CreatedAtUtc)
+            .Select(e => (Guid?)e.Id)
+            .FirstOrDefault();
+
+    private static string StripHtml(string html) =>
+        System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", " ").Trim();
 
     private static string ApplyTemplate(
         string template,

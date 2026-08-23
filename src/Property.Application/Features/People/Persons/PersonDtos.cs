@@ -12,6 +12,7 @@ public sealed class PersonDto
     public string LastName { get; set; } = string.Empty;
     public string? Email { get; set; }
     public string? Phone { get; set; }
+    public bool WhatsAppOptIn { get; set; }
     public bool IsActive { get; set; }
 }
 
@@ -38,6 +39,8 @@ public sealed class CreatePersonDto
 
     [MaxLength(40)]
     public string? Phone { get; set; }
+
+    public bool WhatsAppOptIn { get; set; }
 }
 
 public sealed class UpdatePersonDto
@@ -63,6 +66,8 @@ public sealed class UpdatePersonDto
 
     [MaxLength(40)]
     public string? Phone { get; set; }
+
+    public bool WhatsAppOptIn { get; set; }
 
     public bool IsActive { get; set; } = true;
 }

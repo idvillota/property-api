@@ -12,5 +12,7 @@ public class Person : EntityBase, ITenantScoped
     public string LastName { get; set; } = string.Empty;
     public string? Email { get; set; }
     public string? Phone { get; set; }
+    /// <summary>DIFF-003 — opt-in for operational WhatsApp.</summary>
+    public bool WhatsAppOptIn { get; set; }
     public bool IsActive { get; set; } = true;
 }

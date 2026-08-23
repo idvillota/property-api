@@ -23,6 +23,7 @@ public sealed class PaymentService : IPaymentService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAuditWriter _audit;
     private readonly IOutboxWriter _outbox;
+    private readonly IWebhookPublisher _webhooks;
 
     public PaymentService(
         ApplicationDbContext db,
@@ -33,7 +34,8 @@ public sealed class PaymentService : IPaymentService
         IRepository<Person> people,
         IUnitOfWork unitOfWork,
         IAuditWriter audit,
-        IOutboxWriter outbox)
+        IOutboxWriter outbox,
+        IWebhookPublisher webhooks)
     {
         _db = db;
         _payments = payments;
@@ -44,6 +46,7 @@ public sealed class PaymentService : IPaymentService
         _unitOfWork = unitOfWork;
         _audit = audit;
         _outbox = outbox;
+        _webhooks = webhooks;
     }
 
     public Task<PagedResult<PaymentDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
@@ -203,6 +206,19 @@ public sealed class PaymentService : IPaymentService
                     {
                         PaymentId = payment.Id,
                         HorizontalPropertyId = payment.HorizontalPropertyId,
+                    },
+                    cancellationToken);
+                await _webhooks.EnqueueEventAsync(
+                    WebhookEventTypes.PaymentPosted,
+                    new
+                    {
+                        paymentId = payment.Id,
+                        horizontalPropertyId = payment.HorizontalPropertyId,
+                        unitId = payment.UnitId,
+                        personId = payment.PersonId,
+                        amount = payment.Amount,
+                        paidAt = payment.PaidAt,
+                        method = payment.Method.ToString(),
                     },
                     cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);

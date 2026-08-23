@@ -23,17 +23,20 @@ public sealed class PqrsService : IPqrsService
     private readonly ICurrentTenantContext _tenant;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IOutboxWriter _outbox;
+    private readonly IWebhookPublisher _webhooks;
 
     public PqrsService(
         ApplicationDbContext db,
         ICurrentTenantContext tenant,
         IUnitOfWork unitOfWork,
-        IOutboxWriter outbox)
+        IOutboxWriter outbox,
+        IWebhookPublisher webhooks)
     {
         _db = db;
         _tenant = tenant;
         _unitOfWork = unitOfWork;
         _outbox = outbox;
+        _webhooks = webhooks;
     }
 
     public Task<PagedResult<PqrsCaseDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
@@ -120,6 +123,19 @@ public sealed class PqrsService : IPqrsService
         };
 
         await _db.PqrsCases.AddAsync(entity, cancellationToken);
+        await _webhooks.EnqueueEventAsync(
+            WebhookEventTypes.PqrsCreated,
+            new
+            {
+                pqrsId = entity.Id,
+                horizontalPropertyId = entity.HorizontalPropertyId,
+                unitId = entity.UnitId,
+                createdByPersonId = entity.CreatedByPersonId,
+                category = entity.Category.ToString(),
+                subject = entity.Subject,
+                status = entity.Status.ToString(),
+            },
+            cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return (await GetByIdAsync(entity.Id, cancellationToken))!;
     }

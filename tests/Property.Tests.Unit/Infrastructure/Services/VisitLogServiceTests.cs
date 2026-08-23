@@ -49,7 +49,8 @@ public sealed class VisitLogServiceTests
                 fx.TenantContext,
                 Microsoft.Extensions.Options.Options.Create(
                     new Property.Application.Common.Options.OutboxOptions())),
-            new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext));
+            new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext),
+            new NullWebhookPublisher());
 
     private static RegisterVisitDto Dto(Seed seed, string doc = "12345678", string first = "Ana") =>
         new()

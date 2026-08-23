@@ -84,7 +84,8 @@ public sealed class PaymentIntentServiceTests
                     fx.Db,
                     fx.TenantContext,
                     Microsoft.Extensions.Options.Options.Create(
-                        new Property.Application.Common.Options.OutboxOptions()))),
+                        new Property.Application.Common.Options.OutboxOptions())),
+                new NullWebhookPublisher()),
             new Property.Application.Common.Interfaces.NullPaymentReceiptService(),
             fx.UnitOfWork,
             new Property.Infrastructure.Messaging.OutboxWriter(

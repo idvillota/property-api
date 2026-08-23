@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IRolePermissionService, RolePermissionService>();
         services.AddScoped<INeighborhoodService, NeighborhoodService>();
         services.AddScoped<IHorizontalPropertyService, HorizontalPropertyService>();
+        services.AddScoped<IHoldingService, HoldingService>();
         services.AddScoped<IBuildingService, BuildingService>();
         services.AddScoped<IVehicleService, VehicleService>();
         services.AddScoped<IVehicleBrandService, VehicleBrandService>();
@@ -66,6 +67,7 @@ public static class DependencyInjection
         services.AddScoped<IPaymentIntentService, PaymentIntentService>();
         services.Configure<WompiOptions>(configuration.GetSection(WompiOptions.SectionName));
         services.Configure<DunningOptions>(configuration.GetSection(DunningOptions.SectionName));
+        services.Configure<AiAssistOptions>(configuration.GetSection(AiAssistOptions.SectionName));
         services.AddScoped<IPspCheckoutService, WompiPspCheckoutService>();
         services.AddScoped<IPspWebhookService, WompiWebhookService>();
         services.AddScoped<IDunningAdminService, DunningAdminService>();
@@ -80,9 +82,14 @@ public static class DependencyInjection
         services.AddScoped<IAuditWriter, AuditWriter>();
         services.AddScoped<IAuditQueryService, AuditQueryService>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
+        services.AddScoped<IWhatsAppSender, NoOpWhatsAppSender>();
+        services.AddHttpClient(nameof(HttpWebhookClient));
+        services.AddScoped<IWebhookHttpClient, HttpWebhookClient>();
         services.AddScoped<IOutboxWriter, OutboxWriter>();
         services.AddScoped<IOutboxDispatcher, OutboxDispatcher>();
         services.AddScoped<IOutboxMessageHandler, EmailSendOutboxHandler>();
+        services.AddScoped<IOutboxMessageHandler, WhatsAppSendOutboxHandler>();
+        services.AddScoped<IOutboxMessageHandler, WebhookDeliverOutboxHandler>();
         services.AddScoped<IOutboxMessageHandler, ChargePostedOutboxHandler>();
         services.AddScoped<IOutboxMessageHandler, PaymentPostedOutboxHandler>();
         services.AddScoped<IChartOfAccountsService, ChartOfAccountsService>();
@@ -100,6 +107,9 @@ public static class DependencyInjection
         services.AddScoped<IVisitIntercomRealtime, NullVisitIntercomRealtime>();
         services.AddScoped<IMuralPostService, MuralPostService>();
         services.AddScoped<IPqrsService, PqrsService>();
+        services.AddScoped<IAiAssistService, AiAssistService>();
+        services.AddScoped<IWebhookSubscriptionService, WebhookSubscriptionService>();
+        services.AddScoped<IWebhookPublisher, WebhookPublisher>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IAssemblyService, AssemblyService>();
         services.AddScoped<IVisitorParkingService, VisitorParkingService>();

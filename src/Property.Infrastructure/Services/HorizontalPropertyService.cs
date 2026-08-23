@@ -52,10 +52,6 @@ public sealed class HorizontalPropertyService : IHorizontalPropertyService
 
     public async Task<HorizontalPropertyDto> CreateAsync(CreateHorizontalPropertyDto dto, CancellationToken cancellationToken = default)
     {
-        if (await _properties.Query().AnyAsync(cancellationToken))
-            throw new InvalidOperationException(
-                "This tenant already has a horizontal property. In Colombia each tenant administers exactly one property.");
-
         await EnsureNeighborhoodAsync(dto.NeighborhoodId, cancellationToken);
 
         var entity = new HorizontalProperty

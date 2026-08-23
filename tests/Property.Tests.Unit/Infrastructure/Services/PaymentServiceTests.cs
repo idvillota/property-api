@@ -90,7 +90,8 @@ public sealed class PaymentServiceTests
                 fx.Db,
                 fx.TenantContext,
                 Microsoft.Extensions.Options.Options.Create(
-                    new Property.Application.Common.Options.OutboxOptions())));
+                    new Property.Application.Common.Options.OutboxOptions())),
+            new NullWebhookPublisher());
 
     private static CreatePaymentDto CreateDto(
         Seed seed,

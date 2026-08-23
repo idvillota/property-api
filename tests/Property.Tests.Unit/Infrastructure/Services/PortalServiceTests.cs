@@ -32,7 +32,8 @@ public sealed class PortalServiceTests
                 fx.Db,
                 fx.TenantContext,
                 Microsoft.Extensions.Options.Options.Create(
-                    new Property.Application.Common.Options.OutboxOptions())));
+                    new Property.Application.Common.Options.OutboxOptions())),
+            new NullWebhookPublisher());
         var intents = new PaymentIntentService(
             fx.Db,
             payments,
@@ -69,7 +70,8 @@ public sealed class PortalServiceTests
                 fx.Db,
                 fx.TenantContext,
                 Microsoft.Extensions.Options.Options.Create(
-                    new Property.Application.Common.Options.OutboxOptions())));
+                    new Property.Application.Common.Options.OutboxOptions())),
+            new NullWebhookPublisher());
         var visits = new VisitLogService(
             fx.Db,
             fx.TenantContext,
@@ -79,7 +81,8 @@ public sealed class PortalServiceTests
                 fx.TenantContext,
                 Microsoft.Extensions.Options.Options.Create(
                     new Property.Application.Common.Options.OutboxOptions())),
-            new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext));
+            new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext),
+            new NullWebhookPublisher());
 
         return new PortalService(
             fx.Db,
