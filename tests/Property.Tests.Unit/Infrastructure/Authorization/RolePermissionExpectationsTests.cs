@@ -77,6 +77,16 @@ public sealed class RolePermissionExpectationsTests
             Assert.Contains(FeatureCatalog.All, f => f.Code == code);
     }
 
+    [Fact]
+    public void Accountant_role_has_accounting_features_without_org_roles()
+    {
+        var permissions = Permissions(SystemRoles.Accountant);
+        foreach (var code in FeatureCodes.AccountingAll)
+            Assert.Contains(code, permissions);
+        Assert.DoesNotContain(FeatureCodes.OrganizationRoles, permissions);
+        Assert.Contains(FeatureCodes.DashboardView, permissions);
+    }
+
     private static HashSet<string> Permissions(string roleName) =>
         FeatureCatalog.DefaultFeaturesByRole[roleName].ToHashSet(StringComparer.Ordinal);
 }

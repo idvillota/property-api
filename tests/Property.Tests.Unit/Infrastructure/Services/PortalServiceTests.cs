@@ -27,7 +27,12 @@ public sealed class PortalServiceTests
             fx.Repository<HorizontalProperty>(),
             fx.Repository<Person>(),
             fx.UnitOfWork,
-            new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext));
+            new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext),
+            new Property.Infrastructure.Messaging.OutboxWriter(
+                fx.Db,
+                fx.TenantContext,
+                Microsoft.Extensions.Options.Options.Create(
+                    new Property.Application.Common.Options.OutboxOptions())));
         var intents = new PaymentIntentService(
             fx.Db,
             payments,

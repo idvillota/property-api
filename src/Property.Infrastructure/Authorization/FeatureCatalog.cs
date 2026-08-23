@@ -40,6 +40,14 @@ public static class FeatureCatalog
         new(Guid.Parse("f1000036-003c-403c-803c-000000000036"), FeatureCodes.PortalPay, "Portal digital payments (PSE)", "Portal", 35),
         new(Guid.Parse("f1000037-003d-403d-803d-000000000037"), FeatureCodes.PortalMuralRead, "Portal mural read", "Portal", 40),
         new(Guid.Parse("f100003b-0041-4041-8041-00000000003b"), FeatureCodes.PortalVisits, "Portal visit approval", "Portal", 45),
+        new(Guid.Parse("f100003c-0042-4042-8042-00000000003c"), FeatureCodes.AccountingCoa, "Chart of accounts (PUC)", "Accounting", 710),
+        new(Guid.Parse("f100003d-0043-4043-8043-00000000003d"), FeatureCodes.AccountingJournals, "Journal entries", "Accounting", 720),
+        new(Guid.Parse("f100003e-0044-4044-8044-00000000003e"), FeatureCodes.AccountingBudget, "Budget and execution", "Accounting", 730),
+        new(Guid.Parse("f100003f-0045-4045-8045-00000000003f"), FeatureCodes.AccountingAp, "Accounts payable", "Accounting", 740),
+        new(Guid.Parse("f1000040-0046-4046-8046-000000000040"), FeatureCodes.AccountingPettyCash, "Petty cash", "Accounting", 750),
+        new(Guid.Parse("f1000041-0047-4047-8047-000000000041"), FeatureCodes.AccountingTax, "Withholding tax", "Accounting", 760),
+        new(Guid.Parse("f1000042-0048-4048-8048-000000000042"), FeatureCodes.AccountingReports, "Financial statements and close", "Accounting", 770),
+        new(Guid.Parse("f1000043-0049-4049-8049-000000000043"), FeatureCodes.AccountingBank, "Bank reconciliation", "Accounting", 780),
     ];
 
     public static IReadOnlyDictionary<string, Guid> IdsByCode { get; } =
@@ -56,6 +64,21 @@ public static class FeatureCatalog
                 FeatureCodes.ReceptionManage,
                 FeatureCodes.ReceptionVisits,
                 FeatureCodes.ReceptionIntercom,
+            ],
+            [SystemRoles.Accountant] =
+            [
+                FeatureCodes.DashboardView,
+                FeatureCodes.AccountingCoa,
+                FeatureCodes.AccountingJournals,
+                FeatureCodes.AccountingBudget,
+                FeatureCodes.AccountingAp,
+                FeatureCodes.AccountingPettyCash,
+                FeatureCodes.AccountingTax,
+                FeatureCodes.AccountingReports,
+                FeatureCodes.AccountingBank,
+                FeatureCodes.BillingCharges,
+                FeatureCodes.BillingPayments,
+                FeatureCodes.ReportsView,
             ],
             [SystemRoles.Owner] =
             [

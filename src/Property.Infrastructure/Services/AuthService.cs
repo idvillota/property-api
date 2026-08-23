@@ -77,6 +77,7 @@ public sealed class AuthService : IAuthService
             NewRole(tenant.Id, SystemRoles.Administrator),
             NewRole(tenant.Id, SystemRoles.Manager),
             NewRole(tenant.Id, SystemRoles.Receptionist),
+            NewRole(tenant.Id, SystemRoles.Accountant),
             NewRole(tenant.Id, SystemRoles.Owner),
             NewRole(tenant.Id, SystemRoles.Resident),
         };

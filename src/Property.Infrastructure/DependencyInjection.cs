@@ -10,6 +10,7 @@ using Property.Infrastructure.Messaging;
 using Property.Infrastructure.Payments;
 using Property.Infrastructure.Persistence;
 using Property.Infrastructure.Services;
+using Property.Infrastructure.Services.Accounting;
 using Property.Infrastructure.Storage;
 
 namespace Property.Infrastructure;
@@ -79,6 +80,16 @@ public static class DependencyInjection
         services.AddScoped<IOutboxWriter, OutboxWriter>();
         services.AddScoped<IOutboxDispatcher, OutboxDispatcher>();
         services.AddScoped<IOutboxMessageHandler, EmailSendOutboxHandler>();
+        services.AddScoped<IOutboxMessageHandler, ChargePostedOutboxHandler>();
+        services.AddScoped<IOutboxMessageHandler, PaymentPostedOutboxHandler>();
+        services.AddScoped<IChartOfAccountsService, ChartOfAccountsService>();
+        services.AddScoped<IJournalService, JournalService>();
+        services.AddScoped<IBudgetService, BudgetService>();
+        services.AddScoped<IAccountsPayableService, AccountsPayableService>();
+        services.AddScoped<IPettyCashService, PettyCashService>();
+        services.AddScoped<IWithholdingTaxService, WithholdingTaxService>();
+        services.AddScoped<IAccountingPeriodService, AccountingPeriodService>();
+        services.AddScoped<IBankReconciliationService, BankReconciliationService>();
         services.AddScoped<IReceptionNotificationService, ReceptionNotificationService>();
         services.AddScoped<IReceptionItemService, ReceptionItemService>();
         services.AddScoped<IVisitLogService, VisitLogService>();

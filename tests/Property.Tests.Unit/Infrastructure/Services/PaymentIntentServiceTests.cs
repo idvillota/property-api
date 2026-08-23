@@ -79,7 +79,12 @@ public sealed class PaymentIntentServiceTests
                 fx.Repository<HorizontalProperty>(),
                 fx.Repository<Person>(),
                 fx.UnitOfWork,
-                new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext)),
+                new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext),
+                new Property.Infrastructure.Messaging.OutboxWriter(
+                    fx.Db,
+                    fx.TenantContext,
+                    Microsoft.Extensions.Options.Options.Create(
+                        new Property.Application.Common.Options.OutboxOptions()))),
             new Property.Application.Common.Interfaces.NullPaymentReceiptService(),
             fx.UnitOfWork,
             new Property.Infrastructure.Messaging.OutboxWriter(

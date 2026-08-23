@@ -34,6 +34,14 @@ public static class FeatureCodes
     public const string PortalPay = "portal.pay";
     public const string PortalMuralRead = "portal.mural.read";
     public const string PortalVisits = "portal.visits";
+    public const string AccountingCoa = "accounting.coa";
+    public const string AccountingJournals = "accounting.journals";
+    public const string AccountingBudget = "accounting.budget";
+    public const string AccountingAp = "accounting.ap";
+    public const string AccountingPettyCash = "accounting.pettycash";
+    public const string AccountingTax = "accounting.tax";
+    public const string AccountingReports = "accounting.reports";
+    public const string AccountingBank = "accounting.bank";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -69,5 +77,25 @@ public static class FeatureCodes
         PortalPay,
         PortalMuralRead,
         PortalVisits,
+        AccountingCoa,
+        AccountingJournals,
+        AccountingBudget,
+        AccountingAp,
+        AccountingPettyCash,
+        AccountingTax,
+        AccountingReports,
+        AccountingBank,
+    ];
+
+    public static IReadOnlyList<string> AccountingAll { get; } =
+    [
+        AccountingCoa,
+        AccountingJournals,
+        AccountingBudget,
+        AccountingAp,
+        AccountingPettyCash,
+        AccountingTax,
+        AccountingReports,
+        AccountingBank,
     ];
 }

@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Property.Application.Auditing;
 using Property.Application.Common.Interfaces;
 using Property.Application.Common.Models;
+using Property.Application.Features.Accounting;
 using Property.Application.Features.Billing.Payments;
+using Property.Application.Messaging;
 using Property.Domain.Entities;
 using Property.Domain.Enums;
 using Property.Infrastructure.Common;
@@ -20,6 +22,7 @@ public sealed class PaymentService : IPaymentService
     private readonly IRepository<Person> _people;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAuditWriter _audit;
+    private readonly IOutboxWriter _outbox;
 
     public PaymentService(
         ApplicationDbContext db,
@@ -29,7 +32,8 @@ public sealed class PaymentService : IPaymentService
         IRepository<HorizontalProperty> properties,
         IRepository<Person> people,
         IUnitOfWork unitOfWork,
-        IAuditWriter audit)
+        IAuditWriter audit,
+        IOutboxWriter outbox)
     {
         _db = db;
         _payments = payments;
@@ -39,6 +43,7 @@ public sealed class PaymentService : IPaymentService
         _people = people;
         _unitOfWork = unitOfWork;
         _audit = audit;
+        _outbox = outbox;
     }
 
     public Task<PagedResult<PaymentDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
@@ -190,6 +195,14 @@ public sealed class PaymentService : IPaymentService
                         payment.Reference,
                         allowOverpayment = dto.AllowOverpayment,
                         allocations = payment.Allocations.Select(a => new { a.FeeChargeId, a.Amount }),
+                    },
+                    cancellationToken);
+                await _outbox.EnqueueAsync(
+                    OutboxMessageTypes.PaymentPosted,
+                    new PaymentPostedPayload
+                    {
+                        PaymentId = payment.Id,
+                        HorizontalPropertyId = payment.HorizontalPropertyId,
                     },
                     cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);

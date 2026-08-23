@@ -11,11 +11,16 @@ public sealed class TenantModuleService : ITenantModuleService
 {
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenantContext;
+    private readonly IChartOfAccountsService _coa;
 
-    public TenantModuleService(ApplicationDbContext db, ICurrentTenantContext tenantContext)
+    public TenantModuleService(
+        ApplicationDbContext db,
+        ICurrentTenantContext tenantContext,
+        IChartOfAccountsService coa)
     {
         _db = db;
         _tenantContext = tenantContext;
+        _coa = coa;
     }
 
     public async Task<TenantModuleFlagsDto> GetFlagsAsync(CancellationToken cancellationToken = default)
@@ -29,9 +34,14 @@ public sealed class TenantModuleService : ITenantModuleService
         CancellationToken cancellationToken = default)
     {
         var settings = await GetOrCreateSettingsAsync(cancellationToken);
+        var wasAccounting = settings.ModuleAccountingEnabled;
         Apply(settings, flags);
         _db.TenantSettings.Update(settings);
         await _db.SaveChangesAsync(cancellationToken);
+
+        if (flags.Accounting && !wasAccounting)
+            await _coa.EnsureSeededAsync(cancellationToken);
+
         return Map(settings);
     }
 

@@ -55,6 +55,21 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<FileAsset> FileAssets => Set<FileAsset>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
+    public DbSet<LedgerAccount> LedgerAccounts => Set<LedgerAccount>();
+    public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
+    public DbSet<JournalLine> JournalLines => Set<JournalLine>();
+    public DbSet<Budget> Budgets => Set<Budget>();
+    public DbSet<BudgetLine> BudgetLines => Set<BudgetLine>();
+    public DbSet<Vendor> Vendors => Set<Vendor>();
+    public DbSet<ApInvoice> ApInvoices => Set<ApInvoice>();
+    public DbSet<ApPayment> ApPayments => Set<ApPayment>();
+    public DbSet<PettyCashFund> PettyCashFunds => Set<PettyCashFund>();
+    public DbSet<PettyCashExpense> PettyCashExpenses => Set<PettyCashExpense>();
+    public DbSet<WithholdingTaxRate> WithholdingTaxRates => Set<WithholdingTaxRate>();
+    public DbSet<AccountingPeriod> AccountingPeriods => Set<AccountingPeriod>();
+    public DbSet<BankStatement> BankStatements => Set<BankStatement>();
+    public DbSet<BankStatementLine> BankStatementLines => Set<BankStatementLine>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<User>(e =>
@@ -665,6 +680,128 @@ public sealed class ApplicationDbContext : DbContext
 
     private void ApplyTenantFilters(ModelBuilder modelBuilder)
     {
+
+        modelBuilder.Entity<LedgerAccount>(e =>
+        {
+            e.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+            e.Property(x => x.Code).HasMaxLength(32);
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.ParentCode).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<JournalEntry>(e =>
+        {
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.EntryDate });
+            e.HasIndex(x => new { x.SourceType, x.SourceId });
+            e.Property(x => x.Description).HasMaxLength(500);
+            e.HasOne(x => x.HorizontalProperty).WithMany().HasForeignKey(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne(x => x.JournalEntry).HasForeignKey(x => x.JournalEntryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<JournalLine>(e =>
+        {
+            e.Property(x => x.Debit).HasPrecision(18, 2);
+            e.Property(x => x.Credit).HasPrecision(18, 2);
+            e.Property(x => x.Memo).HasMaxLength(300);
+            e.HasOne(x => x.LedgerAccount).WithMany().HasForeignKey(x => x.LedgerAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Budget>(e =>
+        {
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Year });
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.HasMany(x => x.Lines).WithOne(x => x.Budget).HasForeignKey(x => x.BudgetId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BudgetLine>(e =>
+        {
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.HasOne(x => x.LedgerAccount).WithMany().HasForeignKey(x => x.LedgerAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Vendor>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.TaxId).HasMaxLength(40);
+            e.Property(x => x.Email).HasMaxLength(320);
+        });
+
+        modelBuilder.Entity<ApInvoice>(e =>
+        {
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.InvoiceNumber });
+            e.Property(x => x.InvoiceNumber).HasMaxLength(80);
+            e.Property(x => x.Subtotal).HasPrecision(18, 2);
+            e.Property(x => x.WithholdingAmount).HasPrecision(18, 2);
+            e.Property(x => x.Total).HasPrecision(18, 2);
+            e.Property(x => x.AmountPaid).HasPrecision(18, 2);
+            e.HasOne(x => x.Vendor).WithMany().HasForeignKey(x => x.VendorId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ExpenseAccount).WithMany().HasForeignKey(x => x.ExpenseAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ApPayment>(e =>
+        {
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.Reference).HasMaxLength(120);
+            e.HasOne(x => x.ApInvoice).WithMany().HasForeignKey(x => x.ApInvoiceId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PettyCashFund>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(120);
+            e.Property(x => x.OpeningBalance).HasPrecision(18, 2);
+            e.Property(x => x.CurrentBalance).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<PettyCashExpense>(e =>
+        {
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.Description).HasMaxLength(400);
+            e.HasOne(x => x.PettyCashFund).WithMany().HasForeignKey(x => x.PettyCashFundId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.SupportFileAsset).WithMany().HasForeignKey(x => x.SupportFileAssetId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ExpenseAccount).WithMany().HasForeignKey(x => x.ExpenseAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<WithholdingTaxRate>(e =>
+        {
+            e.HasIndex(x => new { x.TenantId, x.Kind }).IsUnique();
+            e.Property(x => x.Name).HasMaxLength(120);
+            e.Property(x => x.RatePercent).HasPrecision(18, 4);
+            e.Property(x => x.MinimumBase).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<AccountingPeriod>(e =>
+        {
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Year, x.Month }).IsUnique();
+        });
+
+        modelBuilder.Entity<BankStatement>(e =>
+        {
+            e.Property(x => x.AccountLabel).HasMaxLength(120);
+            e.HasMany(x => x.Lines).WithOne(x => x.BankStatement).HasForeignKey(x => x.BankStatementId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BankStatementLine>(e =>
+        {
+            e.Property(x => x.Description).HasMaxLength(400);
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.HasOne(x => x.MatchedPayment).WithMany().HasForeignKey(x => x.MatchedPaymentId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.MatchedJournalEntry).WithMany().HasForeignKey(x => x.MatchedJournalEntryId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+
         modelBuilder.Entity<TenantUser>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 

@@ -5,6 +5,7 @@ using Property.Application.Authorization;
 using Property.Application.Features.Organization.TenantSettings;
 using Property.Domain.Entities;
 using Property.Infrastructure.Services;
+using Property.Infrastructure.Services.Accounting;
 using Property.Tests.Unit.Support;
 
 namespace Property.Tests.Unit.Infrastructure.Services;
@@ -15,7 +16,7 @@ public sealed class TenantModuleServiceTests
     public async Task ModuleFlag_PortalOff_BlocksPortalApi()
     {
         using var fx = new TenantDbFixture();
-        var sut = new TenantModuleService(fx.Db, fx.TenantContext);
+        var sut = new TenantModuleService(fx.Db, fx.TenantContext, new ChartOfAccountsService(fx.Db, fx.TenantContext));
 
         await sut.UpdateFlagsAsync(new TenantModuleFlagsDto
         {
@@ -37,7 +38,7 @@ public sealed class TenantModuleServiceTests
     public async Task ModuleFlag_Accounting_IndependentOfAssemblies()
     {
         using var fx = new TenantDbFixture();
-        var sut = new TenantModuleService(fx.Db, fx.TenantContext);
+        var sut = new TenantModuleService(fx.Db, fx.TenantContext, new ChartOfAccountsService(fx.Db, fx.TenantContext));
 
         await sut.UpdateFlagsAsync(new TenantModuleFlagsDto
         {
@@ -59,7 +60,7 @@ public sealed class TenantModuleServiceTests
     public async Task GetFlagsAsync_Defaults_PortalOn_OthersOff()
     {
         using var fx = new TenantDbFixture();
-        var sut = new TenantModuleService(fx.Db, fx.TenantContext);
+        var sut = new TenantModuleService(fx.Db, fx.TenantContext, new ChartOfAccountsService(fx.Db, fx.TenantContext));
 
         var flags = await sut.GetFlagsAsync();
 

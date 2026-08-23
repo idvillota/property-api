@@ -85,7 +85,12 @@ public sealed class PaymentServiceTests
             fx.Repository<HorizontalProperty>(),
             fx.Repository<Person>(),
             fx.UnitOfWork,
-            new AuditWriter(fx.Db, fx.TenantContext));
+            new AuditWriter(fx.Db, fx.TenantContext),
+            new Property.Infrastructure.Messaging.OutboxWriter(
+                fx.Db,
+                fx.TenantContext,
+                Microsoft.Extensions.Options.Options.Create(
+                    new Property.Application.Common.Options.OutboxOptions())));
 
     private static CreatePaymentDto CreateDto(
         Seed seed,

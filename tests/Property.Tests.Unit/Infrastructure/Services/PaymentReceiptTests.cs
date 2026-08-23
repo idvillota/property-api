@@ -113,7 +113,8 @@ public sealed class PaymentReceiptTests
             fx.Repository<HorizontalProperty>(),
             fx.Repository<Person>(),
             fx.UnitOfWork,
-            new AuditWriter(fx.Db, fx.TenantContext));
+            new AuditWriter(fx.Db, fx.TenantContext),
+            outbox);
         var receipts = new PaymentReceiptService(fx.Db, files, outbox, fx.UnitOfWork);
         return (payments, receipts, root);
     }

@@ -175,7 +175,8 @@ public static class PermissionBootstrap
                 r.NormalizedName == SystemRoles.Administrator.ToUpperInvariant()
                 || r.NormalizedName == SystemRoles.Owner.ToUpperInvariant()
                 || r.NormalizedName == SystemRoles.Manager.ToUpperInvariant()
-                || r.NormalizedName == SystemRoles.Receptionist.ToUpperInvariant())
+                || r.NormalizedName == SystemRoles.Receptionist.ToUpperInvariant()
+                || r.NormalizedName == SystemRoles.Accountant.ToUpperInvariant())
             .ToListAsync(cancellationToken);
 
         if (roles.Count == 0)

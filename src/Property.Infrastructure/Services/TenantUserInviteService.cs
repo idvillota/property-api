@@ -43,7 +43,8 @@ public sealed class TenantUserInviteService : ITenantUserInviteService
         var normalizedRole = roleName.ToUpperInvariant() switch
         {
             "MANAGER" => SystemRoles.Manager,
-            _ => throw new InvalidOperationException("Role must be Manager."),
+            "ACCOUNTANT" => SystemRoles.Accountant,
+            _ => throw new InvalidOperationException("Role must be Manager or Accountant."),
         };
 
         var users = _unitOfWork.Repository<User>();

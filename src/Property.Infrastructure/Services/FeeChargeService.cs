@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Property.Application.Common.Interfaces;
 using Property.Application.Common.Models;
+using Property.Application.Features.Accounting;
 using Property.Application.Features.Billing.FeeCharges;
+using Property.Application.Messaging;
 using Property.Domain.Common;
 using Property.Domain.Entities;
 using Property.Domain.Enums;
@@ -18,6 +20,7 @@ public sealed class FeeChargeService : IFeeChargeService
     private readonly IRepository<Unit> _units;
     private readonly IRepository<HorizontalProperty> _properties;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IOutboxWriter _outbox;
 
     public FeeChargeService(
         ApplicationDbContext db,
@@ -25,7 +28,8 @@ public sealed class FeeChargeService : IFeeChargeService
         IRepository<BillingPeriod> periods,
         IRepository<Unit> units,
         IRepository<HorizontalProperty> properties,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IOutboxWriter outbox)
     {
         _db = db;
         _charges = charges;
@@ -33,6 +37,7 @@ public sealed class FeeChargeService : IFeeChargeService
         _units = units;
         _properties = properties;
         _unitOfWork = unitOfWork;
+        _outbox = outbox;
     }
 
     public Task<PagedResult<FeeChargeDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
@@ -268,6 +273,20 @@ public sealed class FeeChargeService : IFeeChargeService
         period.IsLiquidated = true;
         period.LiquidatedAtUtc = DateTime.UtcNow;
         _periods.Update(period);
+
+        if (newCharges.Count > 0)
+        {
+            await _outbox.EnqueueAsync(
+                OutboxMessageTypes.ChargePosted,
+                new ChargePostedPayload
+                {
+                    HorizontalPropertyId = period.HorizontalPropertyId,
+                    BillingPeriodId = period.Id,
+                    FeeChargeIds = newCharges.Select(c => c.Id).ToList(),
+                },
+                cancellationToken);
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new LiquidationPlan(

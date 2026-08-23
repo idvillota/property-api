@@ -90,7 +90,12 @@ public sealed class FeeChargeLiquidationTests
             fx.Repository<BillingPeriod>(),
             fx.Repository<DomainUnit>(),
             fx.Repository<HorizontalProperty>(),
-            fx.UnitOfWork);
+            fx.UnitOfWork,
+            new Property.Infrastructure.Messaging.OutboxWriter(
+                fx.Db,
+                fx.TenantContext,
+                Microsoft.Extensions.Options.Options.Create(
+                    new Property.Application.Common.Options.OutboxOptions())));
 
     private static LiquidationCommitDto Dto(Seed seed) =>
         new()
