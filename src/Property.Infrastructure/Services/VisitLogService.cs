@@ -294,7 +294,9 @@ public sealed class VisitLogService : IVisitLogService
                 o => o.PersonId,
                 p => p.Id,
                 (_, p) => p)
-            .Where(p => p.Email != null && p.Email != "")
+            .Where(p =>
+                (p.Email != null && p.Email != "") ||
+                (p.WhatsAppOptIn && p.Phone != null && p.Phone != ""))
             .ToListAsync(cancellationToken);
 
         if (contacts.Count == 0)
@@ -306,7 +308,9 @@ public sealed class VisitLogService : IVisitLogService
                     o => o.PersonId,
                     p => p.Id,
                     (_, p) => p)
-                .Where(p => p.Email != null && p.Email != "")
+                .Where(p =>
+                    (p.Email != null && p.Email != "") ||
+                    (p.WhatsAppOptIn && p.Phone != null && p.Phone != ""))
                 .ToListAsync(cancellationToken);
         }
 

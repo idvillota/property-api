@@ -92,6 +92,9 @@ public sealed class PortalService : IPortalService
                 new PortalQuickLinkDto { Id = "mural", Label = "Mural", Path = "/portal/mural", Available = true },
                 new PortalQuickLinkDto { Id = "visitas", Label = "Visitas", Path = "/portal/visitas", Available = true },
                 new PortalQuickLinkDto { Id = "pqrs", Label = "PQRS", Path = "/portal/pqrs", Available = true },
+                new PortalQuickLinkDto { Id = "biblioteca", Label = "Biblioteca", Path = "/portal/library", Available = true },
+                new PortalQuickLinkDto { Id = "encuestas", Label = "Encuestas", Path = "/portal/polls", Available = true },
+                new PortalQuickLinkDto { Id = "asambleas", Label = "Asambleas", Path = "/portal/assemblies", Available = true },
             ],
         };
     }

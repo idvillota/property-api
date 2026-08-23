@@ -6,6 +6,8 @@ public interface IAssemblyService
 {
     Task<AssemblyDto> CreateAsync(CreateAssemblyDto dto, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AssemblyDto>> ListAsync(Guid horizontalPropertyId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AssemblyDto>> ListPublishedAsync(Guid horizontalPropertyId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AssemblyMotionDto>> ListOpenMotionsAsync(Guid assemblyId, CancellationToken cancellationToken = default);
     Task<AssemblyDto?> GetAsync(Guid id, CancellationToken cancellationToken = default);
     Task<AssemblyDto> PublishAsync(Guid id, CancellationToken cancellationToken = default);
     Task<QuorumStatusDto> RegisterAttendanceAsync(RegisterAttendanceDto dto, CancellationToken cancellationToken = default);

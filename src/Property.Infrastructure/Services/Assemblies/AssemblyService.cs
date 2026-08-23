@@ -75,6 +75,37 @@ public sealed class AssemblyService : IAssemblyService
         return list.Select(Map).ToList();
     }
 
+    public async Task<IReadOnlyList<AssemblyDto>> ListPublishedAsync(
+        Guid horizontalPropertyId, CancellationToken cancellationToken = default)
+    {
+        var list = await _db.Assemblies.AsNoTracking()
+            .Include(a => a.AgendaItems)
+            .Where(a =>
+                a.HorizontalPropertyId == horizontalPropertyId &&
+                a.Status == AssemblyStatus.Published)
+            .OrderByDescending(a => a.ScheduledAtUtc)
+            .ToListAsync(cancellationToken);
+        return list.Select(Map).ToList();
+    }
+
+    public async Task<IReadOnlyList<AssemblyMotionDto>> ListOpenMotionsAsync(
+        Guid assemblyId, CancellationToken cancellationToken = default)
+    {
+        return await _db.AssemblyMotions.AsNoTracking()
+            .Where(m => m.AssemblyId == assemblyId && m.Status == AssemblyMotionStatus.Open)
+            .OrderBy(m => m.CreatedAtUtc)
+            .Select(m => new AssemblyMotionDto
+            {
+                Id = m.Id,
+                AssemblyId = m.AssemblyId,
+                Title = m.Title,
+                Description = m.Description,
+                VoteMode = m.VoteMode,
+                Status = m.Status,
+            })
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<AssemblyDto?> GetAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var entity = await _db.Assemblies.AsNoTracking()

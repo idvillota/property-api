@@ -40,7 +40,11 @@ public sealed class HorizontalPropertyService : IHorizontalPropertyService
 
     public async Task<HorizontalPropertyDto?> GetCurrentAsync(CancellationToken cancellationToken = default)
     {
-        var entity = await _properties.Query().AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        // Multi-PH (DIFF-002): stable default = active properties first, then name.
+        var entity = await _properties.Query().AsNoTracking()
+            .OrderByDescending(p => p.IsActive)
+            .ThenBy(p => p.Name)
+            .FirstOrDefaultAsync(cancellationToken);
         return entity is null ? null : Map(entity);
     }
 

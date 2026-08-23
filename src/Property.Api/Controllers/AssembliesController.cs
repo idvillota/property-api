@@ -22,6 +22,20 @@ public sealed class AssembliesController : ControllerBase
         CancellationToken cancellationToken = default) =>
         Ok(await _assemblies.ListAsync(horizontalPropertyId, cancellationToken));
 
+    [HttpGet("portal")]
+    [RequireFeature(FeatureCodes.AssemblyVote)]
+    public async Task<ActionResult<IReadOnlyList<AssemblyDto>>> ListPublished(
+        [FromQuery] Guid horizontalPropertyId,
+        CancellationToken cancellationToken = default) =>
+        Ok(await _assemblies.ListPublishedAsync(horizontalPropertyId, cancellationToken));
+
+    [HttpGet("{assemblyId:guid}/motions/open")]
+    [RequireFeature(FeatureCodes.AssemblyVote)]
+    public async Task<ActionResult<IReadOnlyList<AssemblyMotionDto>>> ListOpenMotions(
+        Guid assemblyId,
+        CancellationToken cancellationToken = default) =>
+        Ok(await _assemblies.ListOpenMotionsAsync(assemblyId, cancellationToken));
+
     [HttpGet("{id:guid}")]
     [RequireFeature(FeatureCodes.AssemblyManage)]
     public async Task<ActionResult<AssemblyDto>> Get(Guid id, CancellationToken cancellationToken = default)
