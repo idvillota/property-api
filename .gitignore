@@ -44,5 +44,8 @@ appsettings.Production.json
 # Uploaded product images (local storage)
 uploads/
 
+# Local file store (ARCH-004 FileStorage Provider=Local)
+App_Data/
+
 # Generated files (comandas, receipts)
 files/

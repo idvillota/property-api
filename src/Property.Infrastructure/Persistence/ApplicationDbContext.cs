@@ -45,6 +45,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<ReceptionItem> ReceptionItems => Set<ReceptionItem>();
     public DbSet<MuralPost> MuralPosts => Set<MuralPost>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<FileAsset> FileAssets => Set<FileAsset>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -480,6 +481,20 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.TenantId, x.Status, x.CreatedAtUtc });
         });
 
+        modelBuilder.Entity<FileAsset>(e =>
+        {
+            e.Property(x => x.StorageKey).HasMaxLength(500);
+            e.Property(x => x.FileName).HasMaxLength(255);
+            e.Property(x => x.ContentType).HasMaxLength(120);
+            e.Property(x => x.Purpose).HasMaxLength(80);
+            e.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => new { x.TenantId, x.StorageKey }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });
+        });
+
         ApplyTenantFilters(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
@@ -565,6 +580,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<OutboxMessage>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<FileAsset>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
     }
 

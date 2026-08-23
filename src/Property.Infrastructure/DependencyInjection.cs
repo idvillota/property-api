@@ -8,6 +8,7 @@ using Property.Infrastructure.Identity;
 using Property.Infrastructure.Messaging;
 using Property.Infrastructure.Persistence;
 using Property.Infrastructure.Services;
+using Property.Infrastructure.Storage;
 
 namespace Property.Infrastructure;
 
@@ -59,6 +60,9 @@ public static class DependencyInjection
         services.AddScoped<IReservationService, ReservationService>();
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
         services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
+        services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
+        RegisterFileStorage(services, configuration);
+        services.AddScoped<IFileAssetService, FileAssetService>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<IOutboxWriter, OutboxWriter>();
         services.AddScoped<IOutboxDispatcher, OutboxDispatcher>();
@@ -69,5 +73,15 @@ public static class DependencyInjection
         services.AddScoped<IReportService, ReportService>();
 
         return services;
+    }
+
+    private static void RegisterFileStorage(IServiceCollection services, IConfiguration configuration)
+    {
+        var provider = configuration.GetSection(FileStorageOptions.SectionName).GetValue<string>("Provider")
+            ?? "Local";
+        if (string.Equals(provider, "S3", StringComparison.OrdinalIgnoreCase))
+            services.AddSingleton<IFileStorage, S3CompatibleFileStorage>();
+        else
+            services.AddSingleton<IFileStorage, LocalDiskFileStorage>();
     }
 }
