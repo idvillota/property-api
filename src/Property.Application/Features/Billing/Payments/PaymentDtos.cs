@@ -23,6 +23,9 @@ public sealed class PaymentDto
     public string? Notes { get; set; }
     public bool IsActive { get; set; }
     public IReadOnlyList<PaymentAllocationDto> Allocations { get; set; } = [];
+
+    /// <summary>Open charge balance for the unit after create (BIL-004). Zero on list/get.</summary>
+    public decimal UnitOpenBalanceAfter { get; set; }
 }
 
 public sealed class CreatePaymentAllocationDto
@@ -58,6 +61,12 @@ public sealed class CreatePaymentDto
 
     [MaxLength(4000)]
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// When false (default), payment amount cannot exceed the unit's open charge balance.
+    /// When true, surplus beyond allocations / open balance is allowed (unallocated sobrante).
+    /// </summary>
+    public bool AllowOverpayment { get; set; }
 
     [Required]
     [MinLength(1)]

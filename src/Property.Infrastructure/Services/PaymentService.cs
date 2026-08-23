@@ -46,7 +46,7 @@ public sealed class PaymentService : IPaymentService
             _payments.Query().AsNoTracking().Include(p => p.Allocations),
             query,
             q => PagedEntityQueries.ShapePayments(q, query),
-            entities => Task.FromResult<IReadOnlyList<PaymentDto>>(entities.Select(Map).ToList()),
+            entities => Task.FromResult<IReadOnlyList<PaymentDto>>(entities.Select(e => Map(e)).ToList()),
             cancellationToken);
 
     public async Task<PaymentDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -60,12 +60,20 @@ public sealed class PaymentService : IPaymentService
     public async Task<PaymentDto> CreateAsync(CreatePaymentDto dto, CancellationToken cancellationToken = default)
     {
         if (dto.Allocations.Count == 0)
-            throw new InvalidOperationException("At least one allocation is required.");
+            throw new InvalidOperationException("Se requiere al menos una asignación a cargos.");
 
         var allocationSum = Math.Round(dto.Allocations.Sum(a => a.Amount), 2, MidpointRounding.AwayFromZero);
         var amount = Math.Round(dto.Amount, 2, MidpointRounding.AwayFromZero);
-        if (allocationSum != amount)
-            throw new InvalidOperationException("Sum of allocations must equal the payment amount.");
+        if (allocationSum <= 0m)
+            throw new InvalidOperationException("La suma de asignaciones debe ser mayor que cero.");
+
+        if (!dto.AllowOverpayment && allocationSum != amount)
+            throw new InvalidOperationException(
+                "La suma de asignaciones debe igualar el monto del pago (o marque permitir sobrante).");
+
+        if (dto.AllowOverpayment && allocationSum > amount)
+            throw new InvalidOperationException(
+                "La suma de asignaciones no puede superar el monto del pago.");
 
         var propertyExists = await _properties.Query().AnyAsync(p => p.Id == dto.HorizontalPropertyId, cancellationToken);
         if (!propertyExists)
@@ -91,6 +99,19 @@ public sealed class PaymentService : IPaymentService
         var strategy = _db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
+            var openBalance = await _charges.Query()
+                .Where(c =>
+                    c.UnitId == dto.UnitId &&
+                    c.HorizontalPropertyId == dto.HorizontalPropertyId &&
+                    c.IsActive &&
+                    (c.Status == FeeChargeStatus.Pending || c.Status == FeeChargeStatus.Partial))
+                .SumAsync(c => c.Amount - c.AmountPaid, cancellationToken);
+            openBalance = Math.Round(openBalance, 2, MidpointRounding.AwayFromZero);
+
+            if (!dto.AllowOverpayment && amount > openBalance)
+                throw new InvalidOperationException(
+                    $"El monto del pago ({amount:0.00}) excede el saldo abierto de la unidad ({openBalance:0.00}). Marque permitir sobrante si desea continuar.");
+
             var charges = await _charges.Query()
                 .Where(c => chargeIds.Contains(c.Id))
                 .ToListAsync(cancellationToken);
@@ -133,9 +154,10 @@ public sealed class PaymentService : IPaymentService
                 {
                     var charge = chargesById[allocationDto.FeeChargeId];
                     var allocationAmount = Math.Round(allocationDto.Amount, 2, MidpointRounding.AwayFromZero);
-                    var remaining = charge.Amount - charge.AmountPaid;
+                    var remaining = Math.Round(charge.Amount - charge.AmountPaid, 2, MidpointRounding.AwayFromZero);
                     if (allocationAmount > remaining)
-                        throw new InvalidOperationException("Allocation exceeds the remaining balance of a fee charge.");
+                        throw new InvalidOperationException(
+                            "La asignación supera el saldo pendiente del cargo.");
 
                     charge.AmountPaid = Math.Round(charge.AmountPaid + allocationAmount, 2, MidpointRounding.AwayFromZero);
                     charge.Status = charge.AmountPaid >= charge.Amount
@@ -166,6 +188,7 @@ public sealed class PaymentService : IPaymentService
                         payment.Amount,
                         payment.Method,
                         payment.Reference,
+                        allowOverpayment = dto.AllowOverpayment,
                         allocations = payment.Allocations.Select(a => new { a.FeeChargeId, a.Amount }),
                     },
                     cancellationToken);
@@ -173,7 +196,11 @@ public sealed class PaymentService : IPaymentService
                 if (transaction is not null)
                     await transaction.CommitAsync(cancellationToken);
 
-                return Map(payment);
+                var balanceAfter = await ComputeUnitOpenBalanceAsync(
+                    dto.HorizontalPropertyId,
+                    dto.UnitId,
+                    cancellationToken);
+                return Map(payment, balanceAfter);
             }
             catch
             {
@@ -244,7 +271,22 @@ public sealed class PaymentService : IPaymentService
         });
     }
 
-    private static PaymentDto Map(Payment entity) =>
+    private async Task<decimal> ComputeUnitOpenBalanceAsync(
+        Guid horizontalPropertyId,
+        Guid unitId,
+        CancellationToken cancellationToken)
+    {
+        var balance = await _charges.Query().AsNoTracking()
+            .Where(c =>
+                c.UnitId == unitId &&
+                c.HorizontalPropertyId == horizontalPropertyId &&
+                c.IsActive &&
+                (c.Status == FeeChargeStatus.Pending || c.Status == FeeChargeStatus.Partial))
+            .SumAsync(c => c.Amount - c.AmountPaid, cancellationToken);
+        return Math.Round(balance, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static PaymentDto Map(Payment entity, decimal unitOpenBalanceAfter = 0m) =>
         new()
         {
             Id = entity.Id,
@@ -257,6 +299,7 @@ public sealed class PaymentService : IPaymentService
             Reference = entity.Reference,
             Notes = entity.Notes,
             IsActive = entity.IsActive,
+            UnitOpenBalanceAfter = unitOpenBalanceAfter,
             Allocations = entity.Allocations
                 .Select(a => new PaymentAllocationDto
                 {
