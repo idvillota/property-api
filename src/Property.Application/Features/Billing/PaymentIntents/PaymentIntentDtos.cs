@@ -14,6 +14,7 @@ public sealed class PaymentIntentDto
     public Guid Id { get; set; }
     public string IdempotencyKey { get; set; } = string.Empty;
     public string? ProviderRef { get; set; }
+    public string Provider { get; set; } = "Wompi";
     public PaymentIntentStatus Status { get; set; }
     public Guid HorizontalPropertyId { get; set; }
     public Guid UnitId { get; set; }

@@ -1,10 +1,14 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Property.Application.Common.Interfaces;
+using Property.Application.Common.Models;
 using Property.Application.Features.Billing.PaymentIntents;
 using Property.Application.Features.Billing.Payments;
+using Property.Application.Messaging;
 using Property.Domain.Entities;
 using Property.Domain.Enums;
+using Property.Infrastructure.Common;
+using Property.Infrastructure.Payments;
 using Property.Infrastructure.Persistence;
 
 namespace Property.Infrastructure.Services;
@@ -20,16 +24,27 @@ public sealed class PaymentIntentService : IPaymentIntentService
     private readonly ApplicationDbContext _db;
     private readonly IPaymentService _payments;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IOutboxWriter _outbox;
 
     public PaymentIntentService(
         ApplicationDbContext db,
         IPaymentService payments,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IOutboxWriter outbox)
     {
         _db = db;
         _payments = payments;
         _unitOfWork = unitOfWork;
+        _outbox = outbox;
     }
+
+    public Task<PagedResult<PaymentIntentDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
+        ListQueryHelpers.ToPagedResultAsync(
+            _db.PaymentIntents.AsNoTracking(),
+            query,
+            q => Shape(q, query),
+            entities => Task.FromResult<IReadOnlyList<PaymentIntentDto>>(entities.Select(Map).ToList()),
+            cancellationToken);
 
     public async Task<PaymentIntentDto> CreateOrGetAsync(
         CreatePaymentIntentDto dto,
@@ -84,6 +99,7 @@ public sealed class PaymentIntentService : IPaymentIntentService
         {
             Id = Guid.NewGuid(),
             IdempotencyKey = key,
+            Provider = WompiPspCheckoutService.ProviderCode,
             ProviderRef = TrimOrNull(dto.ProviderRef),
             Status = PaymentIntentStatus.Pending,
             HorizontalPropertyId = dto.HorizontalPropertyId,
@@ -107,7 +123,6 @@ public sealed class PaymentIntentService : IPaymentIntentService
         }
         catch (DbUpdateException)
         {
-            // Concurrent create with same idempotency key — return the winner.
             _db.Entry(entity).State = EntityState.Detached;
             var raced = await _db.PaymentIntents.AsNoTracking()
                 .FirstOrDefaultAsync(i => i.IdempotencyKey == key, cancellationToken);
@@ -124,6 +139,26 @@ public sealed class PaymentIntentService : IPaymentIntentService
         return entity is null ? null : Map(entity);
     }
 
+    public async Task<PaymentIntentDto> AttachCheckoutAsync(
+        Guid id,
+        string provider,
+        string providerRef,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _db.PaymentIntents.FirstOrDefaultAsync(i => i.Id == id, cancellationToken)
+            ?? throw new InvalidOperationException("Payment intent was not found.");
+
+        if (entity.Status is PaymentIntentStatus.Paid or PaymentIntentStatus.Failed or PaymentIntentStatus.Cancelled)
+            throw new InvalidOperationException($"Cannot attach checkout to {entity.Status} intent.");
+
+        entity.Provider = string.IsNullOrWhiteSpace(provider) ? WompiPspCheckoutService.ProviderCode : provider.Trim();
+        entity.ProviderRef = TrimOrNull(providerRef) ?? entity.ProviderRef;
+        entity.Status = PaymentIntentStatus.RequiresAction;
+        _db.PaymentIntents.Update(entity);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return Map(entity);
+    }
+
     public async Task<PaymentIntentDto> MarkPaidAsync(
         Guid id,
         MarkPaymentIntentPaidDto dto,
@@ -132,7 +167,6 @@ public sealed class PaymentIntentService : IPaymentIntentService
         var entity = await _db.PaymentIntents.FirstOrDefaultAsync(i => i.Id == id, cancellationToken)
             ?? throw new InvalidOperationException("Payment intent was not found.");
 
-        // Idempotent: already Paid → return without creating another Payment (AC2).
         if (entity.Status == PaymentIntentStatus.Paid)
             return Map(entity);
 
@@ -157,9 +191,9 @@ public sealed class PaymentIntentService : IPaymentIntentService
                 PersonId = entity.PersonId,
                 Amount = entity.Amount,
                 PaidAt = paidAt,
-                Method = PaymentMethod.Other,
+                Method = PaymentMethod.Pse,
                 Reference = TrimOrNull(dto.ProviderRef) ?? entity.ProviderRef ?? entity.IdempotencyKey,
-                Notes = $"PaymentIntent {entity.Id}",
+                Notes = $"PaymentIntent {entity.Id} ({entity.Provider})",
                 Allocations = allocations
                     .Select(a => new CreatePaymentAllocationDto
                     {
@@ -170,7 +204,6 @@ public sealed class PaymentIntentService : IPaymentIntentService
             },
             cancellationToken);
 
-        // Reload in case CreateAsync used a different tracking context edge case
         entity = await _db.PaymentIntents.FirstAsync(i => i.Id == id, cancellationToken);
         if (entity.Status == PaymentIntentStatus.Paid && entity.PaymentId.HasValue)
             return Map(entity);
@@ -182,6 +215,8 @@ public sealed class PaymentIntentService : IPaymentIntentService
             entity.ProviderRef = dto.ProviderRef.Trim();
         entity.FailureReason = null;
         _db.PaymentIntents.Update(entity);
+
+        await EnqueueConfirmationEmailAsync(entity, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Map(entity);
     }
@@ -240,6 +275,56 @@ public sealed class PaymentIntentService : IPaymentIntentService
         return Map(entity);
     }
 
+    private async Task EnqueueConfirmationEmailAsync(PaymentIntent entity, CancellationToken cancellationToken)
+    {
+        string? email = null;
+        if (entity.PersonId is Guid personId)
+        {
+            email = await _db.People.AsNoTracking()
+                .Where(p => p.Id == personId)
+                .Select(p => p.Email)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        if (string.IsNullOrWhiteSpace(email))
+            return;
+
+        await _outbox.EnqueueAsync(
+            OutboxMessageTypes.EmailSend,
+            new EmailSendPayload
+            {
+                ToEmail = email,
+                Subject = "Confirmación de pago PSE",
+                HtmlBody =
+                    $"<p>Recibimos tu pago por <strong>{entity.Amount:0.00}</strong> COP.</p>" +
+                    $"<p>Referencia: {entity.ProviderRef ?? entity.IdempotencyKey}</p>",
+            },
+            cancellationToken);
+    }
+
+    private static IQueryable<PaymentIntent> Shape(IQueryable<PaymentIntent> query, ListQuery q)
+    {
+        if (q.FilterValue("horizontalPropertyId") is { } hpRaw &&
+            ListQueryHelpers.TryParseGuid(hpRaw, out var horizontalPropertyId))
+            query = query.Where(e => e.HorizontalPropertyId == horizontalPropertyId);
+
+        if (q.FilterValue("unitId") is { } unitRaw &&
+            ListQueryHelpers.TryParseGuid(unitRaw, out var unitId))
+            query = query.Where(e => e.UnitId == unitId);
+
+        if (q.FilterValue("status") is { } statusRaw &&
+            Enum.TryParse<PaymentIntentStatus>(statusRaw, ignoreCase: true, out var status))
+            query = query.Where(e => e.Status == status);
+
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "createdatutc") switch
+        {
+            "amount" => desc ? query.OrderByDescending(e => e.Amount) : query.OrderBy(e => e.Amount),
+            "status" => desc ? query.OrderByDescending(e => e.Status) : query.OrderBy(e => e.Status),
+            _ => desc ? query.OrderByDescending(e => e.CreatedAtUtc) : query.OrderBy(e => e.CreatedAtUtc),
+        };
+    }
+
     private static void ValidateAllocations(decimal amount, IReadOnlyList<CreatePaymentIntentAllocationDto> allocations)
     {
         if (allocations.Count == 0)
@@ -274,6 +359,7 @@ public sealed class PaymentIntentService : IPaymentIntentService
             Id = entity.Id,
             IdempotencyKey = entity.IdempotencyKey,
             ProviderRef = entity.ProviderRef,
+            Provider = entity.Provider,
             Status = entity.Status,
             HorizontalPropertyId = entity.HorizontalPropertyId,
             UnitId = entity.UnitId,

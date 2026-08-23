@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Property.Application.Common.Interfaces;
 using Property.Application.Features.Amenities.Reservations;
+using Property.Application.Features.Billing.PaymentIntents;
 using Property.Application.Features.Organization.UserPersonLinks;
 using Property.Application.Features.Portal;
 using Property.Domain.Enums;
@@ -13,15 +14,21 @@ public sealed class PortalService : IPortalService
     private readonly ApplicationDbContext _db;
     private readonly IUserPersonLinkService _links;
     private readonly IReservationService _reservations;
+    private readonly IPaymentIntentService _paymentIntents;
+    private readonly IPspCheckoutService _pspCheckout;
 
     public PortalService(
         ApplicationDbContext db,
         IUserPersonLinkService links,
-        IReservationService reservations)
+        IReservationService reservations,
+        IPaymentIntentService paymentIntents,
+        IPspCheckoutService pspCheckout)
     {
         _db = db;
         _links = links;
         _reservations = reservations;
+        _paymentIntents = paymentIntents;
+        _pspCheckout = pspCheckout;
     }
 
     public Task<PortalMeDto> GetMeAsync(Guid userId, CancellationToken cancellationToken = default) =>
@@ -68,6 +75,7 @@ public sealed class PortalService : IPortalService
             QuickLinks =
             [
                 new PortalQuickLinkDto { Id = "cuenta", Label = "Cuenta", Path = "/portal/cuenta", Available = true },
+                new PortalQuickLinkDto { Id = "pagar", Label = "Pagar", Path = "/portal/cuenta/pagar", Available = true },
                 new PortalQuickLinkDto { Id = "reservas", Label = "Reservas", Path = "/portal/reservas", Available = true },
                 new PortalQuickLinkDto { Id = "mural", Label = "Mural", Path = "/portal/mural", Available = false },
                 new PortalQuickLinkDto { Id = "pqrs", Label = "PQRS", Path = "/portal/pqrs", Available = false },
@@ -362,6 +370,123 @@ public sealed class PortalService : IPortalService
         entity.Status = ReservationStatus.Cancelled;
         entity.IsActive = false;
         await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<PortalCheckoutDto> StartPaymentAsync(
+        Guid userId,
+        StartPortalPaymentDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        var me = await _links.GetPortalMeAsync(userId, cancellationToken);
+        if (!await IsUnitInScopeAsync(userId, dto.UnitId, cancellationToken))
+            throw new UnauthorizedAccessException("Unit is not in portal scope.");
+
+        var unit = await _db.Units.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == dto.UnitId, cancellationToken)
+            ?? throw new InvalidOperationException("No encontramos la unidad.");
+
+        var charges = await _db.FeeCharges.AsNoTracking()
+            .Where(c =>
+                c.UnitId == dto.UnitId &&
+                c.IsActive &&
+                (c.Status == FeeChargeStatus.Pending || c.Status == FeeChargeStatus.Partial))
+            .OrderBy(c => c.DueDate)
+            .ThenBy(c => c.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var allocations = new List<CreatePaymentIntentAllocationDto>();
+        decimal amount = 0m;
+        foreach (var charge in charges)
+        {
+            var remaining = Math.Round(charge.Amount - charge.AmountPaid, 2, MidpointRounding.AwayFromZero);
+            if (remaining <= 0m)
+                continue;
+            allocations.Add(new CreatePaymentIntentAllocationDto
+            {
+                FeeChargeId = charge.Id,
+                Amount = remaining,
+            });
+            amount += remaining;
+        }
+
+        amount = Math.Round(amount, 2, MidpointRounding.AwayFromZero);
+        if (amount <= 0m || allocations.Count == 0)
+            throw new InvalidOperationException("No hay saldo pendiente para pagar en esta unidad.");
+
+        var key = string.IsNullOrWhiteSpace(dto.IdempotencyKey)
+            ? $"portal-pse-{me.PersonId:N}-{dto.UnitId:N}-{amount:0.00}"
+            : dto.IdempotencyKey.Trim();
+
+        var intent = await _paymentIntents.CreateOrGetAsync(
+            new CreatePaymentIntentDto
+            {
+                IdempotencyKey = key,
+                HorizontalPropertyId = unit.HorizontalPropertyId,
+                UnitId = dto.UnitId,
+                PersonId = me.PersonId,
+                Amount = amount,
+                Allocations = allocations,
+            },
+            cancellationToken);
+
+        if (intent.Status is PaymentIntentStatus.Paid or PaymentIntentStatus.Cancelled)
+            throw new InvalidOperationException("Este intento de pago ya no está disponible.");
+
+        var checkout = await _pspCheckout.CreateCheckoutAsync(intent, cancellationToken);
+        intent = await _paymentIntents.AttachCheckoutAsync(
+            intent.Id,
+            checkout.Provider,
+            checkout.ProviderRef,
+            cancellationToken);
+
+        return new PortalCheckoutDto
+        {
+            Intent = intent,
+            CheckoutUrl = checkout.CheckoutUrl,
+            IsMockCheckout = checkout.IsMock,
+            Provider = checkout.Provider,
+        };
+    }
+
+    public async Task<PaymentIntentDto?> GetPaymentIntentAsync(
+        Guid userId,
+        Guid intentId,
+        CancellationToken cancellationToken = default)
+    {
+        var me = await _links.GetPortalMeAsync(userId, cancellationToken);
+        var intent = await _paymentIntents.GetByIdAsync(intentId, cancellationToken);
+        if (intent is null)
+            return null;
+        if (intent.PersonId != me.PersonId)
+            throw new UnauthorizedAccessException("No puedes consultar este intento de pago.");
+        if (!await IsUnitInScopeAsync(userId, intent.UnitId, cancellationToken))
+            throw new UnauthorizedAccessException("Unit is not in portal scope.");
+        return intent;
+    }
+
+    public async Task<PaymentIntentDto> ConfirmSandboxPaymentAsync(
+        Guid userId,
+        Guid intentId,
+        CancellationToken cancellationToken = default)
+    {
+        var intent = await GetPaymentIntentAsync(userId, intentId, cancellationToken)
+            ?? throw new InvalidOperationException("No encontramos el intento de pago.");
+
+        if (intent.Status == PaymentIntentStatus.Paid)
+            return intent;
+
+        if (intent.ProviderRef is null ||
+            !intent.ProviderRef.StartsWith("wompi-mock-", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Solo el sandbox mock permite confirmar desde el portal.");
+
+        return await _paymentIntents.MarkPaidAsync(
+            intentId,
+            new MarkPaymentIntentPaidDto
+            {
+                ProviderRef = intent.ProviderRef,
+                PaidAtUtc = DateTime.UtcNow,
+            },
+            cancellationToken);
     }
 
     public async Task<bool> IsUnitInScopeAsync(

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Property.Api.Authorization;
 using Property.Application.Authorization;
 using Property.Application.Common.Interfaces;
+using Property.Application.Common.Models;
 using Property.Application.Features.Billing.PaymentIntents;
 
 namespace Property.Api.Controllers;
@@ -14,6 +15,12 @@ public sealed class PaymentIntentsController : ControllerBase
     private readonly IPaymentIntentService _service;
 
     public PaymentIntentsController(IPaymentIntentService service) => _service = service;
+
+    [HttpGet]
+    public async Task<ActionResult<PagedResult<PaymentIntentDto>>> List(
+        [FromQuery] ListQuery query,
+        CancellationToken cancellationToken = default) =>
+        Ok(await _service.ListAsync(query, cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<PaymentIntentDto>> Create(
@@ -41,7 +48,7 @@ public sealed class PaymentIntentsController : ControllerBase
         return intent is null ? NotFound() : Ok(intent);
     }
 
-    /// <summary>Simulate PSP success (ARCH-005 demo / until DEC-PSP webhooks).</summary>
+    /// <summary>Dev helper — prefer Wompi webhook / portal sandbox-confirm in BIL-011.</summary>
     [HttpPost("{id:guid}/mark-paid")]
     public async Task<ActionResult<PaymentIntentDto>> MarkPaid(
         Guid id,

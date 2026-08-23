@@ -6,4 +6,5 @@ public enum PaymentMethod
     Transfer = 1,
     Check = 2,
     Other = 3,
+    Pse = 4,
 }

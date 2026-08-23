@@ -34,6 +34,7 @@ public static class FeatureCatalog
         new(Guid.Parse("f1000032-0038-4038-8038-000000000032"), FeatureCodes.PortalAccess, "Resident/owner portal", "Portal", 20),
         new(Guid.Parse("f1000034-003a-403a-803a-000000000034"), FeatureCodes.PortalAccountRead, "Portal account statement", "Portal", 25),
         new(Guid.Parse("f1000035-003b-403b-803b-000000000035"), FeatureCodes.PortalReservations, "Portal common-area reservations", "Portal", 30),
+        new(Guid.Parse("f1000036-003c-403c-803c-000000000036"), FeatureCodes.PortalPay, "Portal digital payments (PSE)", "Portal", 35),
     ];
 
     public static IReadOnlyDictionary<string, Guid> IdsByCode { get; } =
@@ -55,12 +56,14 @@ public static class FeatureCatalog
                 FeatureCodes.PortalAccess,
                 FeatureCodes.PortalAccountRead,
                 FeatureCodes.PortalReservations,
+                FeatureCodes.PortalPay,
             ],
             [SystemRoles.Resident] =
             [
                 FeatureCodes.PortalAccess,
                 FeatureCodes.PortalAccountRead,
                 FeatureCodes.PortalReservations,
+                FeatureCodes.PortalPay,
             ],
         };
 }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Property.Api.Authorization;
 using Property.Application.Authorization;
 using Property.Application.Common.Interfaces;
+using Property.Application.Features.Billing.PaymentIntents;
 using Property.Application.Features.Organization.UserPersonLinks;
 using Property.Application.Features.Portal;
 
@@ -213,6 +214,80 @@ public sealed class PortalController : ControllerBase
         {
             await _portal.CancelReservationAsync(userId, id, cancellationToken);
             return NoContent();
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>BIL-011 — start PSE checkout (Wompi) for a linked unit.</summary>
+    [HttpPost("pagos/iniciar")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalPay)]
+    [RequireTenantModule(TenantModuleKeys.DigitalPayments)]
+    public async Task<ActionResult<PortalCheckoutDto>> StartPayment(
+        [FromBody] StartPortalPaymentDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _portal.StartPaymentAsync(userId, dto, cancellationToken));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("pagos/intents/{id:guid}")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalPay)]
+    [RequireTenantModule(TenantModuleKeys.DigitalPayments)]
+    public async Task<ActionResult<PaymentIntentDto>> GetPaymentIntent(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            var intent = await _portal.GetPaymentIntentAsync(userId, id, cancellationToken);
+            return intent is null ? NotFound() : Ok(intent);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+    }
+
+    /// <summary>Sandbox mock confirm (UseMockCheckout) — simulates approved Wompi webhook.</summary>
+    [HttpPost("pagos/intents/{id:guid}/sandbox-confirm")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalPay)]
+    [RequireTenantModule(TenantModuleKeys.DigitalPayments)]
+    public async Task<ActionResult<PaymentIntentDto>> ConfirmSandboxPayment(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _portal.ConfirmSandboxPaymentAsync(userId, id, cancellationToken));
         }
         catch (UnauthorizedAccessException ex)
         {

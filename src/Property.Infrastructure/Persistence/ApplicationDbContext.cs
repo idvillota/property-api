@@ -355,6 +355,7 @@ public sealed class ApplicationDbContext : DbContext
         {
             e.Property(x => x.IdempotencyKey).HasMaxLength(120);
             e.Property(x => x.ProviderRef).HasMaxLength(120);
+            e.Property(x => x.Provider).HasMaxLength(40);
             e.Property(x => x.Amount).HasPrecision(18, 2);
             e.Property(x => x.AllocationsJson).HasColumnType("text");
             e.Property(x => x.FailureReason).HasMaxLength(500);
@@ -376,6 +377,7 @@ public sealed class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => new { x.TenantId, x.IdempotencyKey }).IsUnique();
             e.HasIndex(x => new { x.TenantId, x.Status, x.CreatedAtUtc });
+            e.HasIndex(x => new { x.TenantId, x.ProviderRef });
         });
 
         modelBuilder.Entity<CommonArea>(e =>

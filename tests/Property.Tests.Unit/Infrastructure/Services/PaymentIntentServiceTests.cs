@@ -80,7 +80,12 @@ public sealed class PaymentIntentServiceTests
                 fx.Repository<Person>(),
                 fx.UnitOfWork,
                 new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext)),
-            fx.UnitOfWork);
+            fx.UnitOfWork,
+            new Property.Infrastructure.Messaging.OutboxWriter(
+                fx.Db,
+                fx.TenantContext,
+                Microsoft.Extensions.Options.Options.Create(
+                    new Property.Application.Common.Options.OutboxOptions())));
 
     private static CreatePaymentIntentDto CreateDto(Seed seed, string key, decimal amount = 100m) =>
         new()
@@ -100,7 +105,7 @@ public sealed class PaymentIntentServiceTests
         };
 
     [Fact]
-    public async Task PaymentIntent_IdempotentCreate()
+    public async Task PaymentIntent_Create_IsIdempotent()
     {
         using var fx = new TenantDbFixture();
         var seed = await SeedBillingAsync(fx);

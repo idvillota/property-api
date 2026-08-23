@@ -17,8 +17,35 @@ namespace Property.Tests.Unit.Infrastructure.Services;
 
 public sealed class PortalServiceTests
 {
-    private static PortalService CreateSut(TenantDbFixture fx) =>
-        new(
+    private static PortalService CreateSut(TenantDbFixture fx)
+    {
+        var payments = new PaymentService(
+            fx.Db,
+            fx.Repository<Payment>(),
+            fx.Repository<FeeCharge>(),
+            fx.Repository<DomainUnit>(),
+            fx.Repository<HorizontalProperty>(),
+            fx.Repository<Person>(),
+            fx.UnitOfWork,
+            new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext));
+        var intents = new PaymentIntentService(
+            fx.Db,
+            payments,
+            fx.UnitOfWork,
+            new Property.Infrastructure.Messaging.OutboxWriter(
+                fx.Db,
+                fx.TenantContext,
+                Microsoft.Extensions.Options.Options.Create(
+                    new Property.Application.Common.Options.OutboxOptions())));
+        var checkout = new Property.Infrastructure.Payments.WompiPspCheckoutService(
+            Microsoft.Extensions.Options.Options.Create(
+                new Property.Application.Common.Options.WompiOptions
+                {
+                    UseMockCheckout = true,
+                    PortalPublicBaseUrl = "http://localhost:5173",
+                }));
+
+        return new PortalService(
             fx.Db,
             new UserPersonLinkService(fx.UnitOfWork, fx.Db, fx.TenantContext),
             new ReservationService(
@@ -27,7 +54,10 @@ public sealed class PortalServiceTests
                 fx.Repository<DomainUnit>(),
                 fx.Repository<Person>(),
                 fx.Repository<HorizontalProperty>(),
-                fx.UnitOfWork));
+                fx.UnitOfWork),
+            intents,
+            checkout);
+    }
 
     private static async Task<(User user, Person person, DomainUnit unit, DomainUnit otherUnit, HorizontalProperty property)> SeedLinkedAsync(
         TenantDbFixture fx)

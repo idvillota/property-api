@@ -1,3 +1,4 @@
+using Property.Application.Features.Billing.PaymentIntents;
 using Property.Application.Features.Organization.UserPersonLinks;
 using Property.Application.Features.Portal;
 
@@ -39,6 +40,21 @@ public interface IPortalService
     Task CancelReservationAsync(
         Guid userId,
         Guid reservationId,
+        CancellationToken cancellationToken = default);
+
+    Task<PortalCheckoutDto> StartPaymentAsync(
+        Guid userId,
+        StartPortalPaymentDto dto,
+        CancellationToken cancellationToken = default);
+
+    Task<PaymentIntentDto?> GetPaymentIntentAsync(
+        Guid userId,
+        Guid intentId,
+        CancellationToken cancellationToken = default);
+
+    Task<PaymentIntentDto> ConfirmSandboxPaymentAsync(
+        Guid userId,
+        Guid intentId,
         CancellationToken cancellationToken = default);
 
     Task<bool> IsUnitInScopeAsync(Guid userId, Guid unitId, CancellationToken cancellationToken = default);

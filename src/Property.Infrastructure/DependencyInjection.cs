@@ -7,6 +7,7 @@ using Property.Infrastructure.Auditing;
 using Property.Infrastructure.Common;
 using Property.Infrastructure.Identity;
 using Property.Infrastructure.Messaging;
+using Property.Infrastructure.Payments;
 using Property.Infrastructure.Persistence;
 using Property.Infrastructure.Services;
 using Property.Infrastructure.Storage;
@@ -58,6 +59,9 @@ public static class DependencyInjection
         services.AddScoped<IFeeChargeService, FeeChargeService>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IPaymentIntentService, PaymentIntentService>();
+        services.Configure<WompiOptions>(configuration.GetSection(WompiOptions.SectionName));
+        services.AddScoped<IPspCheckoutService, WompiPspCheckoutService>();
+        services.AddScoped<IPspWebhookService, WompiWebhookService>();
         services.AddScoped<ICommonAreaService, CommonAreaService>();
         services.AddScoped<IReservationService, ReservationService>();
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));

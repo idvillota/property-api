@@ -25,10 +25,11 @@ public sealed class RolePermissionExpectationsTests
     public void Portal_roles_receive_portal_access_only(string roleName)
     {
         var permissions = FeatureCatalog.DefaultFeaturesByRole[roleName];
-        Assert.Equal(3, permissions.Count);
+        Assert.Equal(4, permissions.Count);
         Assert.Contains(FeatureCodes.PortalAccess, permissions);
         Assert.Contains(FeatureCodes.PortalAccountRead, permissions);
         Assert.Contains(FeatureCodes.PortalReservations, permissions);
+        Assert.Contains(FeatureCodes.PortalPay, permissions);
     }
 
     [Fact]

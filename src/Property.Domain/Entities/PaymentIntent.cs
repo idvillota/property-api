@@ -11,8 +11,11 @@ public class PaymentIntent : EntityBase, ITenantScoped
     /// <summary>Unique per tenant — repeated create returns the same intent.</summary>
     public string IdempotencyKey { get; set; } = string.Empty;
 
-    /// <summary>External PSP reference; null until DEC-PSP / provider callback.</summary>
+    /// <summary>External PSP reference; null until checkout/webhook.</summary>
     public string? ProviderRef { get; set; }
+
+    /// <summary>PSP code (DEC-PSP → Wompi).</summary>
+    public string Provider { get; set; } = "Wompi";
 
     public PaymentIntentStatus Status { get; set; } = PaymentIntentStatus.Pending;
 
