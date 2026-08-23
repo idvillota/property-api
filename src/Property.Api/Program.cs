@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Property.Api.Authorization;
+using Property.Api.Hubs;
 using Property.Api.Middleware;
 using Property.Application;
 using Property.Application.Common.Interfaces;
@@ -91,6 +92,9 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ApplicationDbContext>(tags: ["db", "ready"]);
 
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IVisitIntercomRealtime, SignalRVisitIntercomRealtime>();
+
 var app = builder.Build();
 
 // Local environment enables Swagger; migrate + permission bootstrap always run.
@@ -142,5 +146,6 @@ app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<VisitIntercomHub>("/hubs/visit-intercom");
 app.MapHealthChecks("/health");
 app.Run();

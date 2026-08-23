@@ -12,6 +12,7 @@ public sealed class ReceptionNotificationService : IReceptionNotificationService
     private readonly IRepository<ReceptionItem> _items;
     private readonly IRepository<Person> _people;
     private readonly IRepository<Unit> _units;
+    private readonly IRepository<UnitOccupancy> _occupancies;
     private readonly IRepository<HorizontalProperty> _properties;
     private readonly IOutboxWriter _outbox;
     private readonly ILogger<ReceptionNotificationService> _logger;
@@ -20,6 +21,7 @@ public sealed class ReceptionNotificationService : IReceptionNotificationService
         IRepository<ReceptionItem> items,
         IRepository<Person> people,
         IRepository<Unit> units,
+        IRepository<UnitOccupancy> occupancies,
         IRepository<HorizontalProperty> properties,
         IOutboxWriter outbox,
         ILogger<ReceptionNotificationService> logger)
@@ -27,6 +29,7 @@ public sealed class ReceptionNotificationService : IReceptionNotificationService
         _items = items;
         _people = people;
         _units = units;
+        _occupancies = occupancies;
         _properties = properties;
         _outbox = outbox;
         _logger = logger;
@@ -42,20 +45,17 @@ public sealed class ReceptionNotificationService : IReceptionNotificationService
     {
         try
         {
-            // Prefer tracked entity so enqueue can share the same SaveChanges as the use case (ARCH-003).
             var item = await _items.Query()
                 .FirstOrDefaultAsync(e => e.Id == receptionItemId, cancellationToken);
-            if (item?.PersonId is null)
+            if (item is null)
                 return;
 
-            var person = await _people.Query().AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == item.PersonId.Value, cancellationToken);
-            if (person is null || string.IsNullOrWhiteSpace(person.Email))
+            var recipients = await ResolveRecipientsAsync(item, cancellationToken);
+            if (recipients.Count == 0)
             {
                 _logger.LogInformation(
-                    "Skipping reception email for item {ItemId}: no email on person {PersonId}",
-                    receptionItemId,
-                    item.PersonId);
+                    "Skipping reception email for item {ItemId}: no communication contact with email",
+                    receptionItemId);
                 return;
             }
 
@@ -84,28 +84,61 @@ public sealed class ReceptionNotificationService : IReceptionNotificationService
                     deliveredToHabitantName = null;
             }
 
-            var (subject, body) = BuildMessage(
-                item,
-                person,
-                unitCode,
-                propertyName,
-                deliveredToHabitantName,
-                completed);
+            foreach (var person in recipients)
+            {
+                var (subject, body) = BuildMessage(
+                    item,
+                    person,
+                    unitCode,
+                    propertyName,
+                    deliveredToHabitantName,
+                    completed);
 
-            await _outbox.EnqueueAsync(
-                OutboxMessageTypes.EmailSend,
-                new EmailSendPayload
-                {
-                    ToEmail = person.Email,
-                    Subject = subject,
-                    HtmlBody = body,
-                },
-                cancellationToken);
+                await _outbox.EnqueueAsync(
+                    OutboxMessageTypes.EmailSend,
+                    new EmailSendPayload
+                    {
+                        ToEmail = person.Email!,
+                        Subject = subject,
+                        HtmlBody = body,
+                    },
+                    cancellationToken);
+            }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to enqueue reception notification for item {ItemId}", receptionItemId);
         }
+    }
+
+    private async Task<List<Person>> ResolveRecipientsAsync(ReceptionItem item, CancellationToken cancellationToken)
+    {
+        var recipients = new List<Person>();
+        if (item.UnitId is { } unitId)
+        {
+            var responsibleIds = await _occupancies.Query().AsNoTracking()
+                .Where(o => o.UnitId == unitId && o.IsActive && o.IsCommunicationResponsible)
+                .Select(o => o.PersonId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            if (responsibleIds.Count > 0)
+            {
+                recipients = await _people.Query().AsNoTracking()
+                    .Where(p => responsibleIds.Contains(p.Id) && p.Email != null && p.Email != "")
+                    .ToListAsync(cancellationToken);
+            }
+        }
+
+        if (recipients.Count == 0 && item.PersonId is { } personId)
+        {
+            var person = await _people.Query().AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == personId, cancellationToken);
+            if (person is not null && !string.IsNullOrWhiteSpace(person.Email))
+                recipients.Add(person);
+        }
+
+        return recipients;
     }
 
     private static (string Subject, string Body) BuildMessage(

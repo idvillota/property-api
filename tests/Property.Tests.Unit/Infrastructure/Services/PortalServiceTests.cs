@@ -64,6 +64,16 @@ public sealed class PortalServiceTests
                 fx.TenantContext,
                 Microsoft.Extensions.Options.Options.Create(
                     new Property.Application.Common.Options.OutboxOptions())));
+        var visits = new VisitLogService(
+            fx.Db,
+            fx.TenantContext,
+            fx.UnitOfWork,
+            new Property.Infrastructure.Messaging.OutboxWriter(
+                fx.Db,
+                fx.TenantContext,
+                Microsoft.Extensions.Options.Options.Create(
+                    new Property.Application.Common.Options.OutboxOptions())),
+            new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext));
 
         return new PortalService(
             fx.Db,
@@ -78,7 +88,8 @@ public sealed class PortalServiceTests
             intents,
             checkout,
             mural,
-            pqrs);
+            pqrs,
+            visits);
     }
 
     private static async Task<(User user, Person person, DomainUnit unit, DomainUnit otherUnit, HorizontalProperty property)> SeedLinkedAsync(

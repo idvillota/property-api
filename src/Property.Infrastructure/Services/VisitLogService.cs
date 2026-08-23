@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Property.Application.Auditing;
 using Property.Application.Common.Interfaces;
 using Property.Application.Common.Models;
+using Property.Application.Common.Options;
 using Property.Application.Features.Reception.Visits;
+using Property.Application.Messaging;
 using Property.Domain.Entities;
 using Property.Domain.Enums;
 using Property.Infrastructure.Common;
@@ -14,21 +17,29 @@ public sealed class VisitLogService : IVisitLogService
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenant;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IOutboxWriter _outbox;
+    private readonly IAuditWriter _audit;
 
     public VisitLogService(
         ApplicationDbContext db,
         ICurrentTenantContext tenant,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IOutboxWriter outbox,
+        IAuditWriter audit)
     {
         _db = db;
         _tenant = tenant;
         _unitOfWork = unitOfWork;
+        _outbox = outbox;
+        _audit = audit;
     }
 
-    public Task<PagedResult<VisitLogDto>> ListAsync(
+    public async Task<PagedResult<VisitLogDto>> ListAsync(
         ListQuery query,
-        CancellationToken cancellationToken = default) =>
-        ListQueryHelpers.ToPagedResultAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await ExpireOverdueAsync(cancellationToken);
+        return await ListQueryHelpers.ToPagedResultAsync(
             _db.VisitLogs.AsNoTracking()
                 .Include(v => v.Unit)
                 .Include(v => v.VisitorPerson),
@@ -36,6 +47,17 @@ public sealed class VisitLogService : IVisitLogService
             q => Shape(q, query),
             entities => Task.FromResult<IReadOnlyList<VisitLogDto>>(entities.Select(Map).ToList()),
             cancellationToken);
+    }
+
+    public async Task<VisitLogDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await ExpireOverdueAsync(cancellationToken);
+        var entity = await _db.VisitLogs.AsNoTracking()
+            .Include(v => v.Unit)
+            .Include(v => v.VisitorPerson)
+            .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
+        return entity is null ? null : Map(entity);
+    }
 
     public async Task<VisitLogDto> RegisterAsync(
         RegisterVisitDto dto,
@@ -75,7 +97,6 @@ public sealed class VisitLogService : IVisitLogService
         if (existing is not null)
         {
             visitor = existing;
-            // Keep name fresh when reusing (portería may correct spelling)
             visitor.FirstName = firstName;
             visitor.LastName = lastName;
             visitor.IsActive = true;
@@ -95,18 +116,27 @@ public sealed class VisitLogService : IVisitLogService
             await _db.People.AddAsync(visitor, cancellationToken);
         }
 
+        var now = DateTime.UtcNow;
+        var requiresApproval = dto.RequiresApproval;
         var log = new VisitLog
         {
             Id = Guid.NewGuid(),
             HorizontalPropertyId = dto.HorizontalPropertyId,
             UnitId = dto.UnitId,
             VisitorPersonId = visitor.Id,
-            EnteredAtUtc = DateTime.UtcNow,
-            Status = VisitLogStatus.Registered,
+            EnteredAtUtc = now,
+            Status = requiresApproval ? VisitLogStatus.PendingApproval : VisitLogStatus.Registered,
+            ApprovalExpiresAtUtc = requiresApproval
+                ? now.AddMinutes(VisitApprovalOptions.TimeoutMinutes)
+                : null,
             RegisteredByUserId = _tenant.UserId,
             Notes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim(),
         };
         await _db.VisitLogs.AddAsync(log, cancellationToken);
+
+        if (requiresApproval)
+            await EnqueueApprovalEmailsAsync(log, unit, visitor, cancellationToken);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new VisitLogDto
@@ -123,7 +153,176 @@ public sealed class VisitLogService : IVisitLogService
             Status = log.Status,
             Notes = log.Notes,
             VisitorWasReused = visitorWasReused,
+            ApprovalExpiresAtUtc = log.ApprovalExpiresAtUtc,
         };
+    }
+
+    public async Task<VisitLogDto> ApproveAsync(
+        Guid visitId,
+        Guid personId,
+        Guid? userId = null,
+        CancellationToken cancellationToken = default)
+    {
+        await ExpireOverdueAsync(cancellationToken);
+        var visit = await LoadPendingForDecisionAsync(visitId, personId, cancellationToken);
+        ApplyDecision(visit, VisitLogStatus.Approved, personId, userId, overrideReason: null);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return (await GetByIdAsync(visitId, cancellationToken))!;
+    }
+
+    public async Task<VisitLogDto> RejectAsync(
+        Guid visitId,
+        Guid personId,
+        Guid? userId = null,
+        CancellationToken cancellationToken = default)
+    {
+        await ExpireOverdueAsync(cancellationToken);
+        var visit = await LoadPendingForDecisionAsync(visitId, personId, cancellationToken);
+        ApplyDecision(visit, VisitLogStatus.Rejected, personId, userId, overrideReason: null);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return (await GetByIdAsync(visitId, cancellationToken))!;
+    }
+
+    public async Task<VisitLogDto> OverrideApproveAsync(
+        Guid visitId,
+        Guid userId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new InvalidOperationException("Override reason is required.");
+
+        await ExpireOverdueAsync(cancellationToken);
+
+        var visit = await _db.VisitLogs
+            .FirstOrDefaultAsync(v => v.Id == visitId, cancellationToken)
+            ?? throw new InvalidOperationException("Visit was not found.");
+
+        if (visit.Status != VisitLogStatus.PendingApproval)
+            throw new InvalidOperationException("Visit is not pending approval.");
+
+        var before = new { visit.Status, visit.OverrideReason };
+        ApplyDecision(visit, VisitLogStatus.Approved, personId: null, userId, reason.Trim());
+
+        await _audit.WriteAsync(
+            AuditEntityTypes.VisitLog,
+            visit.Id.ToString(),
+            AuditActions.VisitOverrideApproved,
+            before,
+            new { visit.Status, visit.OverrideReason, visit.DecidedByUserId, visit.DecidedAtUtc },
+            cancellationToken);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return (await GetByIdAsync(visitId, cancellationToken))!;
+    }
+
+    public async Task<int> ExpireOverdueAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var overdue = await _db.VisitLogs
+            .Where(v =>
+                v.Status == VisitLogStatus.PendingApproval &&
+                v.ApprovalExpiresAtUtc != null &&
+                v.ApprovalExpiresAtUtc < now)
+            .ToListAsync(cancellationToken);
+
+        if (overdue.Count == 0)
+            return 0;
+
+        foreach (var visit in overdue)
+        {
+            visit.Status = VisitLogStatus.Expired;
+            visit.DecidedAtUtc = now;
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return overdue.Count;
+    }
+
+    private async Task<VisitLog> LoadPendingForDecisionAsync(
+        Guid visitId,
+        Guid personId,
+        CancellationToken cancellationToken)
+    {
+        var visit = await _db.VisitLogs
+            .FirstOrDefaultAsync(v => v.Id == visitId, cancellationToken)
+            ?? throw new InvalidOperationException("Visit was not found.");
+
+        if (visit.Status != VisitLogStatus.PendingApproval)
+            throw new InvalidOperationException("Visit is not pending approval.");
+
+        var hasOccupancy = await _db.UnitOccupancies.AsNoTracking()
+            .AnyAsync(
+                o => o.PersonId == personId && o.UnitId == visit.UnitId && o.IsActive,
+                cancellationToken);
+        if (!hasOccupancy)
+            throw new UnauthorizedAccessException("Person does not have active occupancy on the visit unit.");
+
+        return visit;
+    }
+
+    private static void ApplyDecision(
+        VisitLog visit,
+        VisitLogStatus status,
+        Guid? personId,
+        Guid? userId,
+        string? overrideReason)
+    {
+        visit.Status = status;
+        visit.DecidedAtUtc = DateTime.UtcNow;
+        visit.DecidedByPersonId = personId;
+        visit.DecidedByUserId = userId;
+        visit.OverrideReason = overrideReason;
+    }
+
+    private async Task EnqueueApprovalEmailsAsync(
+        VisitLog log,
+        Unit unit,
+        Person visitor,
+        CancellationToken cancellationToken)
+    {
+        var contacts = await _db.UnitOccupancies.AsNoTracking()
+            .Where(o => o.UnitId == log.UnitId && o.IsActive && o.IsCommunicationResponsible)
+            .Join(
+                _db.People.AsNoTracking(),
+                o => o.PersonId,
+                p => p.Id,
+                (_, p) => p)
+            .Where(p => p.Email != null && p.Email != "")
+            .ToListAsync(cancellationToken);
+
+        if (contacts.Count == 0)
+        {
+            contacts = await _db.UnitOccupancies.AsNoTracking()
+                .Where(o => o.UnitId == log.UnitId && o.IsActive)
+                .Join(
+                    _db.People.AsNoTracking(),
+                    o => o.PersonId,
+                    p => p.Id,
+                    (_, p) => p)
+                .Where(p => p.Email != null && p.Email != "")
+                .ToListAsync(cancellationToken);
+        }
+
+        var visitorName = $"{visitor.FirstName} {visitor.LastName}".Trim();
+        foreach (var person in contacts.DistinctBy(p => p.Id))
+        {
+            await _outbox.EnqueueAsync(
+                OutboxMessageTypes.EmailSend,
+                new EmailSendPayload
+                {
+                    ToEmail = person.Email!,
+                    Subject = $"Visita pendiente de aprobación — unidad {unit.Code}",
+                    HtmlBody =
+                        $"""
+                        <p>Hola {System.Net.WebUtility.HtmlEncode($"{person.FirstName} {person.LastName}".Trim())},</p>
+                        <p>Hay una visita pendiente de aprobación para la unidad <strong>{System.Net.WebUtility.HtmlEncode(unit.Code)}</strong>.</p>
+                        <p>Visitante: <strong>{System.Net.WebUtility.HtmlEncode(visitorName)}</strong>.</p>
+                        <p>Aprueba o rechaza desde el portal en <strong>/portal/visitas</strong>.</p>
+                        """,
+                },
+                cancellationToken);
+        }
     }
 
     private static string NormalizeDocument(string value) =>
@@ -177,5 +376,8 @@ public sealed class VisitLogService : IVisitLogService
             Status = entity.Status,
             Notes = entity.Notes,
             VisitorWasReused = false,
+            ApprovalExpiresAtUtc = entity.ApprovalExpiresAtUtc,
+            DecidedAtUtc = entity.DecidedAtUtc,
+            OverrideReason = entity.OverrideReason,
         };
 }

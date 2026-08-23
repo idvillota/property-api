@@ -81,6 +81,8 @@ public static class DependencyInjection
         services.AddScoped<IReceptionNotificationService, ReceptionNotificationService>();
         services.AddScoped<IReceptionItemService, ReceptionItemService>();
         services.AddScoped<IVisitLogService, VisitLogService>();
+        services.AddScoped<IIntercomService, IntercomService>();
+        services.AddScoped<IVisitIntercomRealtime, NullVisitIntercomRealtime>();
         services.AddScoped<IMuralPostService, MuralPostService>();
         services.AddScoped<IPqrsService, PqrsService>();
         services.AddScoped<IReportService, ReportService>();

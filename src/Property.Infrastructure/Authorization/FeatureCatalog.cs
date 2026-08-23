@@ -28,6 +28,7 @@ public static class FeatureCatalog
         new(Guid.Parse("f100002c-0032-4032-8032-00000000002c"), FeatureCodes.AmenitiesReservations, "Reservations", "Amenities", 520),
         new(Guid.Parse("f100002d-0033-4033-8033-00000000002d"), FeatureCodes.ReceptionManage, "Reception deliveries and messages", "Reception", 610),
         new(Guid.Parse("f1000033-0039-4039-8039-000000000033"), FeatureCodes.ReceptionVisits, "Reception visitor log", "Reception", 620),
+        new(Guid.Parse("f100003a-0040-4040-8040-00000000003a"), FeatureCodes.ReceptionIntercom, "Reception intercom / notify unit", "Reception", 630),
         new(Guid.Parse("f1000030-0036-4036-8036-000000000030"), FeatureCodes.MuralManage, "Community mural notices", "Community", 530),
         new(Guid.Parse("f1000038-003e-403e-803e-000000000038"), FeatureCodes.PqrsCreate, "Create PQRS (portal)", "Community", 540),
         new(Guid.Parse("f1000039-003f-403f-803f-000000000039"), FeatureCodes.PqrsManage, "Manage PQRS inbox", "Community", 550),
@@ -38,6 +39,7 @@ public static class FeatureCatalog
         new(Guid.Parse("f1000035-003b-403b-803b-000000000035"), FeatureCodes.PortalReservations, "Portal common-area reservations", "Portal", 30),
         new(Guid.Parse("f1000036-003c-403c-803c-000000000036"), FeatureCodes.PortalPay, "Portal digital payments (PSE)", "Portal", 35),
         new(Guid.Parse("f1000037-003d-403d-803d-000000000037"), FeatureCodes.PortalMuralRead, "Portal mural read", "Portal", 40),
+        new(Guid.Parse("f100003b-0041-4041-8041-00000000003b"), FeatureCodes.PortalVisits, "Portal visit approval", "Portal", 45),
     ];
 
     public static IReadOnlyDictionary<string, Guid> IdsByCode { get; } =
@@ -53,6 +55,7 @@ public static class FeatureCatalog
                 FeatureCodes.DashboardView,
                 FeatureCodes.ReceptionManage,
                 FeatureCodes.ReceptionVisits,
+                FeatureCodes.ReceptionIntercom,
             ],
             [SystemRoles.Owner] =
             [
@@ -62,6 +65,7 @@ public static class FeatureCatalog
                 FeatureCodes.PortalPay,
                 FeatureCodes.PortalMuralRead,
                 FeatureCodes.PqrsCreate,
+                FeatureCodes.PortalVisits,
             ],
             [SystemRoles.Resident] =
             [
@@ -71,6 +75,7 @@ public static class FeatureCatalog
                 FeatureCodes.PortalPay,
                 FeatureCodes.PortalMuralRead,
                 FeatureCodes.PqrsCreate,
+                FeatureCodes.PortalVisits,
             ],
         };
 }

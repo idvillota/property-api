@@ -40,7 +40,16 @@ public sealed class VisitLogServiceTests
     }
 
     private static VisitLogService CreateSut(TenantDbFixture fx) =>
-        new(fx.Db, fx.TenantContext, fx.UnitOfWork);
+        new(
+            fx.Db,
+            fx.TenantContext,
+            fx.UnitOfWork,
+            new Property.Infrastructure.Messaging.OutboxWriter(
+                fx.Db,
+                fx.TenantContext,
+                Microsoft.Extensions.Options.Options.Create(
+                    new Property.Application.Common.Options.OutboxOptions())),
+            new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext));
 
     private static RegisterVisitDto Dto(Seed seed, string doc = "12345678", string first = "Ana") =>
         new()
@@ -51,6 +60,7 @@ public sealed class VisitLogServiceTests
             DocumentNumber = doc,
             FirstName = first,
             LastName = "Pérez",
+            RequiresApproval = false,
         };
 
     [Fact]

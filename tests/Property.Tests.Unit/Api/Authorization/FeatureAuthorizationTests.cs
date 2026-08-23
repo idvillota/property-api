@@ -80,4 +80,23 @@ public sealed class FeatureAuthorizationTests
         Assert.Contains(FeatureCodes.ReceptionVisits, attribute.FeatureCodes);
         Assert.Equal(2, attribute.FeatureCodes.Count);
     }
+
+    [Fact]
+    public void GuardRoutes_RequireReceptionPermission()
+    {
+        var visits = typeof(VisitLogsController).GetCustomAttribute<RequireAnyFeatureAttribute>();
+        Assert.NotNull(visits);
+        Assert.Contains(FeatureCodes.ReceptionManage, visits!.FeatureCodes);
+        Assert.Contains(FeatureCodes.ReceptionVisits, visits.FeatureCodes);
+
+        var deliveries = typeof(ReceptionItemsController).GetCustomAttribute<RequireFeatureAttribute>();
+        Assert.NotNull(deliveries);
+        Assert.Equal(FeatureAuthorizationPolicies.For(FeatureCodes.ReceptionManage), deliveries!.Policy);
+
+        var notify = typeof(VisitLogsController)
+            .GetMethod(nameof(VisitLogsController.NotifyUnit))!
+            .GetCustomAttribute<RequireFeatureAttribute>();
+        Assert.NotNull(notify);
+        Assert.Equal(FeatureAuthorizationPolicies.For(FeatureCodes.ReceptionIntercom), notify!.Policy);
+    }
 }

@@ -101,8 +101,12 @@ public sealed class ReceptionItemService : IReceptionItemService
             IsActive = true,
         };
         await _items.AddAsync(entity, cancellationToken);
-        await _notifications.NotifyItemStartedAsync(entity.Id, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+        if (dto.Notify)
+        {
+            await _notifications.NotifyItemStartedAsync(entity.Id, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
         var list = await EnrichAsync([entity], cancellationToken);
         return list[0];
     }

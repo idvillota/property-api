@@ -46,6 +46,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<ReceptionItem> ReceptionItems => Set<ReceptionItem>();
     public DbSet<VisitLog> VisitLogs => Set<VisitLog>();
+    public DbSet<InAppNotification> InAppNotifications => Set<InAppNotification>();
     public DbSet<MuralPost> MuralPosts => Set<MuralPost>();
     public DbSet<MuralPostRead> MuralPostReads => Set<MuralPostRead>();
     public DbSet<PqrsCase> PqrsCases => Set<PqrsCase>();
@@ -498,6 +499,7 @@ public sealed class ApplicationDbContext : DbContext
         modelBuilder.Entity<VisitLog>(e =>
         {
             e.Property(x => x.Notes).HasMaxLength(1000);
+            e.Property(x => x.OverrideReason).HasMaxLength(1000);
             e.HasOne(x => x.HorizontalProperty)
                 .WithMany()
                 .HasForeignKey(x => x.HorizontalPropertyId)
@@ -514,9 +516,34 @@ public sealed class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.RegisteredByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.DecidedByPerson)
+                .WithMany()
+                .HasForeignKey(x => x.DecidedByPersonId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.DecidedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.DecidedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.EnteredAtUtc });
             e.HasIndex(x => new { x.TenantId, x.UnitId, x.EnteredAtUtc });
             e.HasIndex(x => x.VisitorPersonId);
+        });
+
+        modelBuilder.Entity<InAppNotification>(e =>
+        {
+            e.Property(x => x.Type).HasMaxLength(80);
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Body).HasMaxLength(2000);
+            e.Property(x => x.LinkPath).HasMaxLength(400);
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.Person)
+                .WithMany()
+                .HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => new { x.TenantId, x.PersonId, x.CreatedAtUtc });
         });
 
         modelBuilder.Entity<MuralPost>(e =>
@@ -716,6 +743,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<VisitLog>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<InAppNotification>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<MuralPost>().HasQueryFilter(e =>

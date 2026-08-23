@@ -6,6 +6,7 @@ using Property.Application.Features.Community.Mural;
 using Property.Application.Features.Community.Pqrs;
 using Property.Application.Features.Organization.UserPersonLinks;
 using Property.Application.Features.Portal;
+using Property.Application.Features.Reception.Visits;
 using Property.Domain.Enums;
 using Property.Infrastructure.Persistence;
 
@@ -20,6 +21,7 @@ public sealed class PortalService : IPortalService
     private readonly IPspCheckoutService _pspCheckout;
     private readonly IMuralPostService _mural;
     private readonly IPqrsService _pqrs;
+    private readonly IVisitLogService _visits;
 
     public PortalService(
         ApplicationDbContext db,
@@ -28,7 +30,8 @@ public sealed class PortalService : IPortalService
         IPaymentIntentService paymentIntents,
         IPspCheckoutService pspCheckout,
         IMuralPostService mural,
-        IPqrsService pqrs)
+        IPqrsService pqrs,
+        IVisitLogService visits)
     {
         _db = db;
         _links = links;
@@ -37,6 +40,7 @@ public sealed class PortalService : IPortalService
         _pspCheckout = pspCheckout;
         _mural = mural;
         _pqrs = pqrs;
+        _visits = visits;
     }
 
     public Task<PortalMeDto> GetMeAsync(Guid userId, CancellationToken cancellationToken = default) =>
@@ -86,6 +90,7 @@ public sealed class PortalService : IPortalService
                 new PortalQuickLinkDto { Id = "pagar", Label = "Pagar", Path = "/portal/cuenta/pagar", Available = true },
                 new PortalQuickLinkDto { Id = "reservas", Label = "Reservas", Path = "/portal/reservas", Available = true },
                 new PortalQuickLinkDto { Id = "mural", Label = "Mural", Path = "/portal/mural", Available = true },
+                new PortalQuickLinkDto { Id = "visitas", Label = "Visitas", Path = "/portal/visitas", Available = true },
                 new PortalQuickLinkDto { Id = "pqrs", Label = "PQRS", Path = "/portal/pqrs", Available = true },
             ],
         };
@@ -593,6 +598,58 @@ public sealed class PortalService : IPortalService
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<VisitLogDto>> ListPendingVisitsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var (_, unitIds) = await _links.GetPortalScopeAsync(userId, cancellationToken);
+        if (unitIds.Count == 0)
+            return Array.Empty<VisitLogDto>();
+
+        await _visits.ExpireOverdueAsync(cancellationToken);
+
+        var rows = await _db.VisitLogs.AsNoTracking()
+            .Include(v => v.Unit)
+            .Include(v => v.VisitorPerson)
+            .Where(v => unitIds.Contains(v.UnitId) && v.Status == VisitLogStatus.PendingApproval)
+            .OrderBy(v => v.EnteredAtUtc)
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(MapVisit).ToList();
+    }
+
+    public async Task<VisitLogDto> ApproveVisitAsync(
+        Guid userId,
+        Guid visitId,
+        CancellationToken cancellationToken = default)
+    {
+        var me = await _links.GetPortalMeAsync(userId, cancellationToken);
+        var visit = await _db.VisitLogs.AsNoTracking()
+            .FirstOrDefaultAsync(v => v.Id == visitId, cancellationToken)
+            ?? throw new InvalidOperationException("Visit was not found.");
+
+        if (!await IsUnitInScopeAsync(userId, visit.UnitId, cancellationToken))
+            throw new UnauthorizedAccessException("Unit is not in portal scope.");
+
+        return await _visits.ApproveAsync(visitId, me.PersonId, userId, cancellationToken);
+    }
+
+    public async Task<VisitLogDto> RejectVisitAsync(
+        Guid userId,
+        Guid visitId,
+        CancellationToken cancellationToken = default)
+    {
+        var me = await _links.GetPortalMeAsync(userId, cancellationToken);
+        var visit = await _db.VisitLogs.AsNoTracking()
+            .FirstOrDefaultAsync(v => v.Id == visitId, cancellationToken)
+            ?? throw new InvalidOperationException("Visit was not found.");
+
+        if (!await IsUnitInScopeAsync(userId, visit.UnitId, cancellationToken))
+            throw new UnauthorizedAccessException("Unit is not in portal scope.");
+
+        return await _visits.RejectAsync(visitId, me.PersonId, userId, cancellationToken);
+    }
+
     public async Task<bool> IsUnitInScopeAsync(
         Guid userId,
         Guid unitId,
@@ -601,6 +658,28 @@ public sealed class PortalService : IPortalService
         var (_, unitIds) = await _links.GetPortalScopeAsync(userId, cancellationToken);
         return unitIds.Contains(unitId);
     }
+
+    private static VisitLogDto MapVisit(Domain.Entities.VisitLog entity) =>
+        new()
+        {
+            Id = entity.Id,
+            HorizontalPropertyId = entity.HorizontalPropertyId,
+            UnitId = entity.UnitId,
+            UnitCode = entity.Unit?.Code ?? string.Empty,
+            VisitorPersonId = entity.VisitorPersonId,
+            VisitorFullName = entity.VisitorPerson is null
+                ? string.Empty
+                : $"{entity.VisitorPerson.FirstName} {entity.VisitorPerson.LastName}".Trim(),
+            DocumentType = entity.VisitorPerson?.DocumentType ?? DocumentType.Other,
+            DocumentNumber = entity.VisitorPerson?.DocumentNumber ?? string.Empty,
+            EnteredAtUtc = entity.EnteredAtUtc,
+            Status = entity.Status,
+            Notes = entity.Notes,
+            VisitorWasReused = false,
+            ApprovalExpiresAtUtc = entity.ApprovalExpiresAtUtc,
+            DecidedAtUtc = entity.DecidedAtUtc,
+            OverrideReason = entity.OverrideReason,
+        };
 
     private static void ValidateDuration(
         int? minMinutes,

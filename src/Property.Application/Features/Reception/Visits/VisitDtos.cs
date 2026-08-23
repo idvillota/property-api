@@ -17,6 +17,9 @@ public sealed class VisitLogDto
     public VisitLogStatus Status { get; set; }
     public string? Notes { get; set; }
     public bool VisitorWasReused { get; set; }
+    public DateTime? ApprovalExpiresAtUtc { get; set; }
+    public DateTime? DecidedAtUtc { get; set; }
+    public string? OverrideReason { get; set; }
 }
 
 public sealed class RegisterVisitDto
@@ -43,4 +46,25 @@ public sealed class RegisterVisitDto
 
     [MaxLength(1000)]
     public string? Notes { get; set; }
+
+    /// <summary>When true (default), visit starts as PendingApproval with a timeout.</summary>
+    public bool RequiresApproval { get; set; } = true;
+}
+
+public sealed class OverrideApproveVisitDto
+{
+    [Required]
+    [MaxLength(500)]
+    public string Reason { get; set; } = string.Empty;
+}
+
+public sealed class VisitIntercomAlertDto
+{
+    public Guid VisitId { get; set; }
+    public Guid UnitId { get; set; }
+    public string UnitCode { get; set; } = string.Empty;
+    public string VisitorFullName { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string Body { get; set; } = string.Empty;
+    public string LinkPath { get; set; } = "/portal/visitas";
 }

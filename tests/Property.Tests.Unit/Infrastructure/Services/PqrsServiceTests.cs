@@ -246,6 +246,15 @@ public sealed class PqrsServiceTests
             fx.TenantContext,
             fx.UnitOfWork);
         var pqrs = CreateSut(fx);
+        var visits = new VisitLogService(
+            fx.Db,
+            fx.TenantContext,
+            fx.UnitOfWork,
+            new OutboxWriter(
+                fx.Db,
+                fx.TenantContext,
+                Microsoft.Extensions.Options.Options.Create(new OutboxOptions())),
+            new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext));
 
         return new PortalService(
             fx.Db,
@@ -260,6 +269,7 @@ public sealed class PqrsServiceTests
             intents,
             checkout,
             mural,
-            pqrs);
+            pqrs,
+            visits);
     }
 }

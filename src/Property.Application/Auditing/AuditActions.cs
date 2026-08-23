@@ -6,6 +6,7 @@ public static class AuditActions
     public const string PaymentCreated = "Payment.Created";
     public const string PspWebhookInvalidSignature = "PspWebhook.InvalidSignature";
     public const string PspWebhookProcessed = "PspWebhook.Processed";
+    public const string VisitOverrideApproved = "VisitLog.OverrideApproved";
 }
 
 public static class AuditEntityTypes
@@ -14,4 +15,5 @@ public static class AuditEntityTypes
     public const string Payment = "Payment";
     public const string PaymentIntent = "PaymentIntent";
     public const string PspWebhook = "PspWebhook";
+    public const string VisitLog = "VisitLog";
 }

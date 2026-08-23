@@ -3,6 +3,7 @@ using Property.Application.Features.Community.Mural;
 using Property.Application.Features.Community.Pqrs;
 using Property.Application.Features.Organization.UserPersonLinks;
 using Property.Application.Features.Portal;
+using Property.Application.Features.Reception.Visits;
 
 namespace Property.Application.Common.Interfaces;
 
@@ -80,6 +81,20 @@ public interface IPortalService
     Task<PaymentIntentDto> ConfirmSandboxPaymentAsync(
         Guid userId,
         Guid intentId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<VisitLogDto>> ListPendingVisitsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    Task<VisitLogDto> ApproveVisitAsync(
+        Guid userId,
+        Guid visitId,
+        CancellationToken cancellationToken = default);
+
+    Task<VisitLogDto> RejectVisitAsync(
+        Guid userId,
+        Guid visitId,
         CancellationToken cancellationToken = default);
 
     Task<bool> IsUnitInScopeAsync(Guid userId, Guid unitId, CancellationToken cancellationToken = default);

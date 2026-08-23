@@ -8,6 +8,7 @@ using Property.Application.Features.Community.Mural;
 using Property.Application.Features.Community.Pqrs;
 using Property.Application.Features.Organization.UserPersonLinks;
 using Property.Application.Features.Portal;
+using Property.Application.Features.Reception.Visits;
 
 namespace Property.Api.Controllers;
 
@@ -400,6 +401,71 @@ public sealed class PortalController : ControllerBase
         try
         {
             return Ok(await _portal.ConfirmSandboxPaymentAsync(userId, id, cancellationToken));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>REC-011 — pending visit approvals for linked units.</summary>
+    [HttpGet("visitas")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalVisits)]
+    public async Task<ActionResult<IReadOnlyList<VisitLogDto>>> ListPendingVisits(CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _portal.ListPendingVisitsAsync(userId, cancellationToken));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Person link required for portal access." });
+        }
+    }
+
+    /// <summary>REC-011 — approve a pending visit.</summary>
+    [HttpPost("visitas/{id:guid}/approve")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalVisits)]
+    public async Task<ActionResult<VisitLogDto>> ApproveVisit(Guid id, CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _portal.ApproveVisitAsync(userId, id, cancellationToken));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>REC-011 — reject a pending visit.</summary>
+    [HttpPost("visitas/{id:guid}/reject")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalVisits)]
+    public async Task<ActionResult<VisitLogDto>> RejectVisit(Guid id, CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _portal.RejectVisitAsync(userId, id, cancellationToken));
         }
         catch (UnauthorizedAccessException ex)
         {

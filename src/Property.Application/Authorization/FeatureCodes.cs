@@ -22,6 +22,7 @@ public static class FeatureCodes
     public const string AmenitiesReservations = "amenities.reservations";
     public const string ReceptionManage = "reception.manage";
     public const string ReceptionVisits = "reception.visits";
+    public const string ReceptionIntercom = "reception.intercom";
     public const string MuralManage = "mural.manage";
     public const string PqrsCreate = "pqrs.create";
     public const string PqrsManage = "pqrs.manage";
@@ -32,6 +33,7 @@ public static class FeatureCodes
     public const string PortalReservations = "portal.reservations";
     public const string PortalPay = "portal.pay";
     public const string PortalMuralRead = "portal.mural.read";
+    public const string PortalVisits = "portal.visits";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -55,6 +57,7 @@ public static class FeatureCodes
         AmenitiesReservations,
         ReceptionManage,
         ReceptionVisits,
+        ReceptionIntercom,
         MuralManage,
         PqrsCreate,
         PqrsManage,
@@ -65,5 +68,6 @@ public static class FeatureCodes
         PortalReservations,
         PortalPay,
         PortalMuralRead,
+        PortalVisits,
     ];
 }

@@ -65,6 +65,9 @@ public sealed class CreateReceptionItemDto
 
     [MaxLength(4000)]
     public string? Notes { get; set; }
+
+    /// <summary>REC-020 — enqueue email to unit contact on create (default true).</summary>
+    public bool Notify { get; set; } = true;
 }
 
 public sealed class UpdateReceptionItemDto
