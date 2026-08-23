@@ -46,6 +46,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<MuralPost> MuralPosts => Set<MuralPost>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<FileAsset> FileAssets => Set<FileAsset>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -495,6 +496,21 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });
         });
 
+        modelBuilder.Entity<AuditEvent>(e =>
+        {
+            e.Property(x => x.EntityType).HasMaxLength(120);
+            e.Property(x => x.EntityId).HasMaxLength(80);
+            e.Property(x => x.Action).HasMaxLength(120);
+            e.Property(x => x.BeforeJson).HasColumnType("text");
+            e.Property(x => x.AfterJson).HasColumnType("text");
+            e.HasOne(x => x.ActorUser)
+                .WithMany()
+                .HasForeignKey(x => x.ActorUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => new { x.TenantId, x.OccurredAtUtc });
+            e.HasIndex(x => new { x.TenantId, x.EntityType, x.EntityId });
+        });
+
         ApplyTenantFilters(modelBuilder);
         base.OnModelCreating(modelBuilder);
     }
@@ -584,10 +600,19 @@ public sealed class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<FileAsset>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<AuditEvent>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        foreach (var entry in ChangeTracker.Entries<AuditEvent>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+                throw new InvalidOperationException("AuditEvent is append-only and cannot be updated or deleted.");
+        }
+
         var utc = DateTime.UtcNow;
         foreach (var entry in ChangeTracker.Entries<EntityBase>())
         {

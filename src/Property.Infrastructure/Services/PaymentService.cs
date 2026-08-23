@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Property.Application.Auditing;
 using Property.Application.Common.Interfaces;
 using Property.Application.Common.Models;
 using Property.Application.Features.Billing.Payments;
@@ -18,6 +19,7 @@ public sealed class PaymentService : IPaymentService
     private readonly IRepository<HorizontalProperty> _properties;
     private readonly IRepository<Person> _people;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IAuditWriter _audit;
 
     public PaymentService(
         ApplicationDbContext db,
@@ -26,7 +28,8 @@ public sealed class PaymentService : IPaymentService
         IRepository<Unit> units,
         IRepository<HorizontalProperty> properties,
         IRepository<Person> people,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IAuditWriter audit)
     {
         _db = db;
         _payments = payments;
@@ -35,6 +38,7 @@ public sealed class PaymentService : IPaymentService
         _properties = properties;
         _people = people;
         _unitOfWork = unitOfWork;
+        _audit = audit;
     }
 
     public Task<PagedResult<PaymentDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
@@ -148,6 +152,23 @@ public sealed class PaymentService : IPaymentService
                 }
 
                 await _payments.AddAsync(payment, cancellationToken);
+                await _audit.WriteAsync(
+                    AuditEntityTypes.Payment,
+                    payment.Id.ToString(),
+                    AuditActions.PaymentCreated,
+                    before: null,
+                    after: new
+                    {
+                        payment.Id,
+                        payment.HorizontalPropertyId,
+                        payment.UnitId,
+                        payment.PersonId,
+                        payment.Amount,
+                        payment.Method,
+                        payment.Reference,
+                        allocations = payment.Allocations.Select(a => new { a.FeeChargeId, a.Amount }),
+                    },
+                    cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
                 if (transaction is not null)
                     await transaction.CommitAsync(cancellationToken);

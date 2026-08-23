@@ -29,6 +29,7 @@ public static class FeatureCatalog
         new(Guid.Parse("f100002d-0033-4033-8033-00000000002d"), FeatureCodes.ReceptionManage, "Reception deliveries and messages", "Reception", 610),
         new(Guid.Parse("f1000030-0036-4036-8036-000000000030"), FeatureCodes.MuralManage, "Community mural notices", "Community", 530),
         new(Guid.Parse("f100002e-0034-4034-8034-00000000002e"), FeatureCodes.ReportsView, "Reports", "Reports", 200),
+        new(Guid.Parse("f1000031-0037-4037-8037-000000000031"), FeatureCodes.AuditView, "View audit trail", "Administration", 170),
     ];
 
     public static IReadOnlyDictionary<string, Guid> IdsByCode { get; } =

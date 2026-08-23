@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Property.Application.Common.Interfaces;
 using Property.Application.Common.Options;
+using Property.Infrastructure.Auditing;
 using Property.Infrastructure.Common;
 using Property.Infrastructure.Identity;
 using Property.Infrastructure.Messaging;
@@ -63,6 +64,8 @@ public static class DependencyInjection
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
         RegisterFileStorage(services, configuration);
         services.AddScoped<IFileAssetService, FileAssetService>();
+        services.AddScoped<IAuditWriter, AuditWriter>();
+        services.AddScoped<IAuditQueryService, AuditQueryService>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<IOutboxWriter, OutboxWriter>();
         services.AddScoped<IOutboxDispatcher, OutboxDispatcher>();

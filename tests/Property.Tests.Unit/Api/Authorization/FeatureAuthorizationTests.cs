@@ -62,6 +62,7 @@ public sealed class FeatureAuthorizationTests
     [InlineData(typeof(ReservationsController), FeatureCodes.AmenitiesReservations)]
     [InlineData(typeof(ReceptionItemsController), FeatureCodes.ReceptionManage)]
     [InlineData(typeof(ReportsController), FeatureCodes.ReportsView)]
+    [InlineData(typeof(AuditEventsController), FeatureCodes.AuditView)]
     public void Secured_controllers_require_matching_feature(Type controllerType, string featureCode)
     {
         var attribute = controllerType.GetCustomAttribute<RequireFeatureAttribute>();

@@ -49,7 +49,10 @@ public sealed class AuthServiceTests
         }
 
         var tenantContext = new Property.Infrastructure.Common.CurrentTenantContext();
-        IRolePermissionService rolePermissions = new RolePermissionService(fx.Db, tenantContext);
+        IRolePermissionService rolePermissions = new RolePermissionService(
+            fx.Db,
+            tenantContext,
+            new Property.Infrastructure.Auditing.AuditWriter(fx.Db, tenantContext));
         var platform = Options.Create(new PlatformOptions
         {
             AdminEmails = ["idvillota@gmail.com"],

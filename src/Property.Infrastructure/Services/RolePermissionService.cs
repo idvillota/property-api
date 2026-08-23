@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Property.Application.Auditing;
 using Property.Application.Common.Interfaces;
 using Property.Application.Features.Organization.RolePermissions;
 using Property.Domain.Entities;
@@ -11,11 +12,16 @@ public sealed class RolePermissionService : IRolePermissionService
 {
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenantContext;
+    private readonly IAuditWriter _audit;
 
-    public RolePermissionService(ApplicationDbContext db, ICurrentTenantContext tenantContext)
+    public RolePermissionService(
+        ApplicationDbContext db,
+        ICurrentTenantContext tenantContext,
+        IAuditWriter audit)
     {
         _db = db;
         _tenantContext = tenantContext;
+        _audit = audit;
     }
 
     public async Task<RolePermissionMatrixDto> GetMatrixAsync(CancellationToken cancellationToken = default)
@@ -85,6 +91,13 @@ public sealed class RolePermissionService : IRolePermissionService
         if (features.Count != requested.Count)
             throw new InvalidOperationException("One or more feature codes are invalid.");
 
+        var beforeCodes = await _db.RoleFeatures
+            .AsNoTracking()
+            .Where(rf => rf.RoleId == roleId)
+            .Select(rf => rf.Feature.Code)
+            .OrderBy(c => c)
+            .ToListAsync(cancellationToken);
+
         var existing = await _db.RoleFeatures.Where(rf => rf.RoleId == roleId).ToListAsync(cancellationToken);
         _db.RoleFeatures.RemoveRange(existing);
 
@@ -98,6 +111,15 @@ public sealed class RolePermissionService : IRolePermissionService
         }).ToList();
 
         await _db.RoleFeatures.AddRangeAsync(roleFeatures, cancellationToken);
+
+        var afterCodes = requested.OrderBy(c => c).ToList();
+        await _audit.WriteAsync(
+            AuditEntityTypes.Role,
+            roleId.ToString(),
+            AuditActions.RolePermissionsUpdated,
+            before: new { roleName = role.Name, featureCodes = beforeCodes },
+            after: new { roleName = role.Name, featureCodes = afterCodes },
+            cancellationToken);
 
         await _db.SaveChangesAsync(cancellationToken);
     }

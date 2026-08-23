@@ -78,7 +78,8 @@ public sealed class PaymentIntentServiceTests
                 fx.Repository<DomainUnit>(),
                 fx.Repository<HorizontalProperty>(),
                 fx.Repository<Person>(),
-                fx.UnitOfWork),
+                fx.UnitOfWork,
+                new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext)),
             fx.UnitOfWork);
 
     private static CreatePaymentIntentDto CreateDto(Seed seed, string key, decimal amount = 100m) =>
