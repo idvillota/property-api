@@ -11,6 +11,8 @@ public interface IFeeChargeService
     Task<FeeChargeDto?> UpdateAsync(Guid id, UpdateFeeChargeDto dto, CancellationToken cancellationToken = default);
     Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
     Task<GenerateChargesResultDto> GenerateOrdinaryAsync(GenerateOrdinaryChargesDto dto, CancellationToken cancellationToken = default);
+    Task<LiquidationPreviewDto> PreviewLiquidationAsync(LiquidationCommitDto dto, CancellationToken cancellationToken = default);
+    Task<LiquidationResultDto> CommitLiquidationAsync(LiquidationCommitDto dto, CancellationToken cancellationToken = default);
     Task<GenerateChargesResultDto> GenerateInterestAsync(GenerateInterestChargesDto dto, CancellationToken cancellationToken = default);
     Task<ArrearsSummaryDto> GetArrearsSummaryAsync(Guid horizontalPropertyId, CancellationToken cancellationToken = default);
 }

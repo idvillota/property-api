@@ -139,14 +139,58 @@ public sealed class FeeChargeService : IFeeChargeService
         GenerateOrdinaryChargesDto dto,
         CancellationToken cancellationToken = default)
     {
+        var result = await CommitLiquidationAsync(
+            new LiquidationCommitDto
+            {
+                HorizontalPropertyId = dto.HorizontalPropertyId,
+                BillingPeriodId = dto.BillingPeriodId,
+            },
+            cancellationToken);
+
+        return new GenerateChargesResultDto
+        {
+            CreatedCount = result.CreatedCount,
+            SkippedCount = 0,
+            TotalAmount = result.TotalAmount,
+        };
+    }
+
+    public async Task<LiquidationPreviewDto> PreviewLiquidationAsync(
+        LiquidationCommitDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        var plan = await BuildOrdinaryLiquidationPlanAsync(dto, persist: false, cancellationToken);
+        return plan.Preview;
+    }
+
+    public async Task<LiquidationResultDto> CommitLiquidationAsync(
+        LiquidationCommitDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        var plan = await BuildOrdinaryLiquidationPlanAsync(dto, persist: true, cancellationToken);
+        return plan.Commit!;
+    }
+
+    private sealed record LiquidationPlan(LiquidationPreviewDto Preview, LiquidationResultDto? Commit);
+
+    private async Task<LiquidationPlan> BuildOrdinaryLiquidationPlanAsync(
+        LiquidationCommitDto dto,
+        bool persist,
+        CancellationToken cancellationToken)
+    {
         var period = await _periods.Query()
             .FirstOrDefaultAsync(
                 p => p.Id == dto.BillingPeriodId && p.HorizontalPropertyId == dto.HorizontalPropertyId,
                 cancellationToken)
             ?? throw new InvalidOperationException("Billing period was not found for the horizontal property.");
 
+        var periodKey = $"{period.Year:D4}-{period.Month:D2}";
+
+        if (period.IsLiquidated)
+            throw new InvalidOperationException("Billing period is already liquidated.");
+
         if (period.Status != BillingPeriodStatus.Open)
-            throw new InvalidOperationException("Billing period must be Open to generate ordinary charges.");
+            throw new InvalidOperationException("Billing period must be Open to liquidate ordinary charges.");
 
         var settings = await _db.FeeSettings
             .FirstOrDefaultAsync(s => s.HorizontalPropertyId == dto.HorizontalPropertyId, cancellationToken);
@@ -166,23 +210,19 @@ public sealed class FeeChargeService : IFeeChargeService
             .ToListAsync(cancellationToken);
         var existingSet = existingUnitIds.ToHashSet();
 
+        // Treat any prior ordinary charges as already liquidated (legacy periods without the flag).
+        if (existingSet.Count > 0)
+            throw new InvalidOperationException("Billing period is already liquidated.");
+
         var dueDay = Math.Clamp(settings.DueDayOfMonth, 1, 28);
         var daysInMonth = DateTime.DaysInMonth(period.Year, period.Month);
         var dueDate = new DateOnly(period.Year, period.Month, Math.Min(dueDay, daysInMonth));
 
-        var created = 0;
-        var skipped = 0;
-        var totalAmount = 0m;
         var newCharges = new List<FeeCharge>();
+        var totalAmount = 0m;
 
         foreach (var unit in units)
         {
-            if (existingSet.Contains(unit.Id))
-            {
-                skipped++;
-                continue;
-            }
-
             CoefficientRules.EnsureValid(unit.Coefficient);
             var amount = Math.Round(
                 settings.MonthlyBudgetAmount * (unit.Coefficient / CoefficientRules.Total),
@@ -196,7 +236,7 @@ public sealed class FeeChargeService : IFeeChargeService
                 BillingPeriodId = period.Id,
                 UnitId = unit.Id,
                 ChargeType = FeeChargeType.Ordinary,
-                Description = $"Ordinary administration fee {period.Year:D4}-{period.Month:D2}",
+                Description = $"Ordinary administration fee {periodKey}",
                 CoefficientSnapshot = unit.Coefficient,
                 Amount = amount,
                 AmountPaid = 0m,
@@ -204,22 +244,43 @@ public sealed class FeeChargeService : IFeeChargeService
                 Status = FeeChargeStatus.Pending,
                 IsActive = true,
             });
-            created++;
             totalAmount += amount;
         }
 
-        if (newCharges.Count > 0)
+        var preview = new LiquidationPreviewDto
         {
-            await _charges.AddRangeAsync(newCharges, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-        }
-
-        return new GenerateChargesResultDto
-        {
-            CreatedCount = created,
-            SkippedCount = skipped,
+            BillingPeriodId = period.Id,
+            PeriodKey = periodKey,
+            IsLiquidated = false,
+            BillableUnitCount = units.Count,
+            ChargeCount = newCharges.Count,
             TotalAmount = totalAmount,
+            MonthlyBudgetAmount = settings.MonthlyBudgetAmount,
+            DueDate = dueDate,
         };
+
+        if (!persist)
+            return new LiquidationPlan(preview, null);
+
+        if (newCharges.Count > 0)
+            await _charges.AddRangeAsync(newCharges, cancellationToken);
+
+        period.IsLiquidated = true;
+        period.LiquidatedAtUtc = DateTime.UtcNow;
+        _periods.Update(period);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return new LiquidationPlan(
+            preview,
+            new LiquidationResultDto
+            {
+                BillingPeriodId = period.Id,
+                PeriodKey = periodKey,
+                CreatedCount = newCharges.Count,
+                TotalAmount = totalAmount,
+                IsLiquidated = true,
+                LiquidatedAtUtc = period.LiquidatedAtUtc,
+            });
     }
 
     public async Task<GenerateChargesResultDto> GenerateInterestAsync(

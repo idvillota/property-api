@@ -84,6 +84,38 @@ public sealed class GenerateChargesResultDto
     public decimal TotalAmount { get; set; }
 }
 
+/// <summary>BIL-014 — dry-run totals for ordinary cuota liquidación.</summary>
+public sealed class LiquidationPreviewDto
+{
+    public Guid BillingPeriodId { get; set; }
+    public string PeriodKey { get; set; } = string.Empty;
+    public bool IsLiquidated { get; set; }
+    public int BillableUnitCount { get; set; }
+    public int ChargeCount { get; set; }
+    public decimal TotalAmount { get; set; }
+    public decimal MonthlyBudgetAmount { get; set; }
+    public DateOnly DueDate { get; set; }
+}
+
+public sealed class LiquidationCommitDto
+{
+    [Required]
+    public Guid HorizontalPropertyId { get; set; }
+
+    [Required]
+    public Guid BillingPeriodId { get; set; }
+}
+
+public sealed class LiquidationResultDto
+{
+    public Guid BillingPeriodId { get; set; }
+    public string PeriodKey { get; set; } = string.Empty;
+    public int CreatedCount { get; set; }
+    public decimal TotalAmount { get; set; }
+    public bool IsLiquidated { get; set; }
+    public DateTime? LiquidatedAtUtc { get; set; }
+}
+
 public sealed class ArrearsSummaryDto
 {
     public decimal TotalPending { get; set; }

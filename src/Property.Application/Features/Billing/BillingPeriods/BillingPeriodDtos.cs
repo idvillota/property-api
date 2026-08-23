@@ -12,6 +12,8 @@ public sealed class BillingPeriodDto
     public string PeriodKey { get; set; } = string.Empty;
     public BillingPeriodStatus Status { get; set; }
     public string? Notes { get; set; }
+    public bool IsLiquidated { get; set; }
+    public DateTime? LiquidatedAtUtc { get; set; }
 }
 
 public sealed class CreateBillingPeriodDto

@@ -108,5 +108,7 @@ public sealed class BillingPeriodService : IBillingPeriodService
             PeriodKey = $"{entity.Year:D4}-{entity.Month:D2}",
             Status = entity.Status,
             Notes = entity.Notes,
+            IsLiquidated = entity.IsLiquidated,
+            LiquidatedAtUtc = entity.LiquidatedAtUtc,
         };
 }

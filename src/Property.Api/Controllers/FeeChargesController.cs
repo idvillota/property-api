@@ -84,6 +84,44 @@ public sealed class FeeChargesController : ControllerBase
         }
     }
 
+    /// <summary>BIL-014 — preview ordinary cuota liquidación (no persist).</summary>
+    [HttpPost("liquidation/preview")]
+    public async Task<ActionResult<LiquidationPreviewDto>> PreviewLiquidation(
+        [FromBody] LiquidationCommitDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            return Ok(await _service.PreviewLiquidationAsync(dto, cancellationToken));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>BIL-014 — commit ordinary cuota liquidación (idempotent per period).</summary>
+    [HttpPost("liquidation/commit")]
+    public async Task<ActionResult<LiquidationResultDto>> CommitLiquidation(
+        [FromBody] LiquidationCommitDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            return Ok(await _service.CommitLiquidationAsync(dto, cancellationToken));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPost("generate-interest")]
     public async Task<ActionResult<GenerateChargesResultDto>> GenerateInterest(
         [FromBody] GenerateInterestChargesDto dto,
