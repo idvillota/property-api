@@ -60,8 +60,11 @@ public static class DependencyInjection
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IPaymentIntentService, PaymentIntentService>();
         services.Configure<WompiOptions>(configuration.GetSection(WompiOptions.SectionName));
+        services.Configure<DunningOptions>(configuration.GetSection(DunningOptions.SectionName));
         services.AddScoped<IPspCheckoutService, WompiPspCheckoutService>();
         services.AddScoped<IPspWebhookService, WompiWebhookService>();
+        services.AddScoped<IDunningAdminService, DunningAdminService>();
+        services.AddScoped<IDunningJobService, DunningJobService>();
         services.AddScoped<ICommonAreaService, CommonAreaService>();
         services.AddScoped<IReservationService, ReservationService>();
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));

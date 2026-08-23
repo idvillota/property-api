@@ -8,6 +8,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<OutboxDispatchHostedService>();
+builder.Services.AddHostedService<DunningHostedService>();
 
 var host = builder.Build();
 host.Run();
