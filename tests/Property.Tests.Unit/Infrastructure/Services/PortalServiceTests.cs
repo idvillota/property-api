@@ -46,11 +46,24 @@ public sealed class PortalServiceTests
                 }));
         var mural = new MuralPostService(
             fx.Repository<MuralPost>(),
+            fx.Repository<MuralPostRead>(),
             fx.Repository<HorizontalProperty>(),
             fx.Repository<DomainUnit>(),
+            fx.Repository<Building>(),
+            fx.Repository<Floor>(),
+            fx.Repository<UnitOccupancy>(),
             fx.Repository<User>(),
             fx.TenantContext,
             fx.UnitOfWork);
+        var pqrs = new PqrsService(
+            fx.Db,
+            fx.TenantContext,
+            fx.UnitOfWork,
+            new Property.Infrastructure.Messaging.OutboxWriter(
+                fx.Db,
+                fx.TenantContext,
+                Microsoft.Extensions.Options.Options.Create(
+                    new Property.Application.Common.Options.OutboxOptions())));
 
         return new PortalService(
             fx.Db,
@@ -64,7 +77,8 @@ public sealed class PortalServiceTests
                 fx.UnitOfWork),
             intents,
             checkout,
-            mural);
+            mural,
+            pqrs);
     }
 
     private static async Task<(User user, Person person, DomainUnit unit, DomainUnit otherUnit, HorizontalProperty property)> SeedLinkedAsync(

@@ -3,6 +3,7 @@ using Property.Application.Common.Interfaces;
 using Property.Application.Features.Amenities.Reservations;
 using Property.Application.Features.Billing.PaymentIntents;
 using Property.Application.Features.Community.Mural;
+using Property.Application.Features.Community.Pqrs;
 using Property.Application.Features.Organization.UserPersonLinks;
 using Property.Application.Features.Portal;
 using Property.Domain.Enums;
@@ -18,6 +19,7 @@ public sealed class PortalService : IPortalService
     private readonly IPaymentIntentService _paymentIntents;
     private readonly IPspCheckoutService _pspCheckout;
     private readonly IMuralPostService _mural;
+    private readonly IPqrsService _pqrs;
 
     public PortalService(
         ApplicationDbContext db,
@@ -25,7 +27,8 @@ public sealed class PortalService : IPortalService
         IReservationService reservations,
         IPaymentIntentService paymentIntents,
         IPspCheckoutService pspCheckout,
-        IMuralPostService mural)
+        IMuralPostService mural,
+        IPqrsService pqrs)
     {
         _db = db;
         _links = links;
@@ -33,6 +36,7 @@ public sealed class PortalService : IPortalService
         _paymentIntents = paymentIntents;
         _pspCheckout = pspCheckout;
         _mural = mural;
+        _pqrs = pqrs;
     }
 
     public Task<PortalMeDto> GetMeAsync(Guid userId, CancellationToken cancellationToken = default) =>
@@ -82,7 +86,7 @@ public sealed class PortalService : IPortalService
                 new PortalQuickLinkDto { Id = "pagar", Label = "Pagar", Path = "/portal/cuenta/pagar", Available = true },
                 new PortalQuickLinkDto { Id = "reservas", Label = "Reservas", Path = "/portal/reservas", Available = true },
                 new PortalQuickLinkDto { Id = "mural", Label = "Mural", Path = "/portal/mural", Available = true },
-                new PortalQuickLinkDto { Id = "pqrs", Label = "PQRS", Path = "/portal/pqrs", Available = false },
+                new PortalQuickLinkDto { Id = "pqrs", Label = "PQRS", Path = "/portal/pqrs", Available = true },
             ],
         };
     }
@@ -380,8 +384,96 @@ public sealed class PortalService : IPortalService
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        _ = await _links.GetPortalMeAsync(userId, cancellationToken);
-        return await _mural.ListPublicAsync(cancellationToken: cancellationToken);
+        var me = await _links.GetPortalMeAsync(userId, cancellationToken);
+        var unitIds = me.UnitIds.ToHashSet();
+        if (unitIds.Count == 0)
+        {
+            return await _mural.ListPublicAsync(
+                readerScope: new MuralReaderScope(),
+                cancellationToken: cancellationToken);
+        }
+
+        var units = await _db.Units.AsNoTracking()
+            .Where(u => unitIds.Contains(u.Id))
+            .Select(u => new { u.BuildingId, u.FloorId })
+            .ToListAsync(cancellationToken);
+
+        var roles = await _db.UnitOccupancies.AsNoTracking()
+            .Where(o => o.PersonId == me.PersonId && o.IsActive && unitIds.Contains(o.UnitId))
+            .Select(o => o.Role)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var scope = new MuralReaderScope
+        {
+            BuildingIds = units
+                .Where(u => u.BuildingId.HasValue)
+                .Select(u => u.BuildingId!.Value)
+                .Distinct()
+                .ToList(),
+            FloorIds = units
+                .Where(u => u.FloorId.HasValue)
+                .Select(u => u.FloorId!.Value)
+                .Distinct()
+                .ToList(),
+            OccupancyRoles = roles,
+        };
+
+        return await _mural.ListPublicAsync(readerScope: scope, cancellationToken: cancellationToken);
+    }
+
+    public async Task<MuralPostReadDto> MarkMuralReadAsync(
+        Guid userId,
+        Guid muralPostId,
+        CancellationToken cancellationToken = default)
+    {
+        var me = await _links.GetPortalMeAsync(userId, cancellationToken);
+        return await _mural.MarkReadAsync(muralPostId, me.PersonId, userId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PqrsCaseDto>> ListMyPqrsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var me = await _links.GetPortalMeAsync(userId, cancellationToken);
+        return await _pqrs.ListMineAsync(me.PersonId, cancellationToken);
+    }
+
+    public async Task<PqrsCaseDto> CreatePqrsAsync(
+        Guid userId,
+        CreatePortalPqrsDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        var me = await _links.GetPortalMeAsync(userId, cancellationToken);
+
+        if (!await IsUnitInScopeAsync(userId, dto.UnitId, cancellationToken))
+            throw new UnauthorizedAccessException("Unit is not in portal scope.");
+
+        var unit = await _db.Units.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == dto.UnitId && u.IsActive, cancellationToken)
+            ?? throw new InvalidOperationException("No encontramos la unidad.");
+
+        return await _pqrs.CreateAsync(
+            new CreatePqrsCaseDto
+            {
+                HorizontalPropertyId = unit.HorizontalPropertyId,
+                UnitId = dto.UnitId,
+                CreatedByPersonId = me.PersonId,
+                Category = dto.Category,
+                Subject = dto.Subject,
+                Description = dto.Description,
+                AttachmentFileAssetIds = dto.AttachmentFileAssetIds,
+            },
+            cancellationToken);
+    }
+
+    public async Task<PqrsCaseDto?> GetMyPqrsAsync(
+        Guid userId,
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var me = await _links.GetPortalMeAsync(userId, cancellationToken);
+        return await _pqrs.GetMineByIdAsync(me.PersonId, id, cancellationToken);
     }
 
     public async Task<PortalCheckoutDto> StartPaymentAsync(

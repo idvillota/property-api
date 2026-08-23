@@ -82,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<IReceptionItemService, ReceptionItemService>();
         services.AddScoped<IVisitLogService, VisitLogService>();
         services.AddScoped<IMuralPostService, MuralPostService>();
+        services.AddScoped<IPqrsService, PqrsService>();
         services.AddScoped<IReportService, ReportService>();
 
         return services;

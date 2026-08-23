@@ -701,5 +701,50 @@ internal static class PagedEntityQueries
             .OrderByDescending(e => e.IsPinned)
             .ThenByDescending(e => e.PublishedAtUtc);
     }
+
+    public static IQueryable<PqrsCase> ShapePqrsCases(IQueryable<PqrsCase> query, ListQuery q)
+    {
+        if (!q.IncludeInactive)
+            query = query.Where(e => e.IsActive);
+
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+        {
+            query = query.Where(e =>
+                EF.Functions.ILike(e.Subject, EfTextSearch.LikePattern(search)) ||
+                EF.Functions.ILike(e.Description, EfTextSearch.LikePattern(search)));
+        }
+
+        if (q.FilterValue("horizontalPropertyId") is { } hpRaw &&
+            ListQueryHelpers.TryParseGuid(hpRaw, out var horizontalPropertyId))
+            query = query.Where(e => e.HorizontalPropertyId == horizontalPropertyId);
+
+        if (q.FilterValue("status") is { } statusRaw &&
+            Enum.TryParse<PqrsStatus>(statusRaw, ignoreCase: true, out var status))
+            query = query.Where(e => e.Status == status);
+
+        if (q.FilterValue("category") is { } categoryRaw &&
+            Enum.TryParse<PqrsCategory>(categoryRaw, ignoreCase: true, out var category))
+            query = query.Where(e => e.Category == category);
+
+        if (q.FilterValue("unitId") is { } unitRaw &&
+            ListQueryHelpers.TryParseGuid(unitRaw, out var unitId))
+            query = query.Where(e => e.UnitId == unitId);
+
+        if (q.FilterValue("isActive") is { } activeRaw &&
+            ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
+            query = query.Where(e => e.IsActive == isActive);
+
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "createdatutc") switch
+        {
+            "status" => desc ? query.OrderByDescending(e => e.Status) : query.OrderBy(e => e.Status),
+            "category" => desc ? query.OrderByDescending(e => e.Category) : query.OrderBy(e => e.Category),
+            "subject" => desc ? query.OrderByDescending(e => e.Subject) : query.OrderBy(e => e.Subject),
+            "dueatutc" => desc ? query.OrderByDescending(e => e.DueAtUtc) : query.OrderBy(e => e.DueAtUtc),
+            "isactive" => desc ? query.OrderByDescending(e => e.IsActive) : query.OrderBy(e => e.IsActive),
+            _ => desc ? query.OrderByDescending(e => e.CreatedAtUtc) : query.OrderBy(e => e.CreatedAtUtc),
+        };
+    }
 }
 

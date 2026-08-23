@@ -29,6 +29,15 @@ public sealed class MuralPostsController : ControllerBase
         return item is null ? NotFound() : Ok(item);
     }
 
+    [HttpGet("{id:guid}/read-stats")]
+    public async Task<ActionResult<MuralReadStatsDto>> GetReadStats(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var stats = await _service.GetReadStatsAsync(id, cancellationToken);
+        return stats is null ? NotFound() : Ok(stats);
+    }
+
     [HttpPost]
     public async Task<ActionResult<MuralPostDto>> Create(
         [FromBody] CreateMuralPostDto dto,
@@ -41,6 +50,24 @@ public sealed class MuralPostsController : ControllerBase
         {
             var created = await _service.CreateAsync(dto, cancellationToken);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("audience-preview")]
+    public async Task<ActionResult<MuralAudiencePreviewDto>> PreviewAudience(
+        [FromBody] MuralAudiencePreviewRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            return Ok(await _service.PreviewAudienceAsync(request, cancellationToken));
         }
         catch (InvalidOperationException ex)
         {

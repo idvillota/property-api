@@ -47,6 +47,9 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<ReceptionItem> ReceptionItems => Set<ReceptionItem>();
     public DbSet<VisitLog> VisitLogs => Set<VisitLog>();
     public DbSet<MuralPost> MuralPosts => Set<MuralPost>();
+    public DbSet<MuralPostRead> MuralPostReads => Set<MuralPostRead>();
+    public DbSet<PqrsCase> PqrsCases => Set<PqrsCase>();
+    public DbSet<PqrsComment> PqrsComments => Set<PqrsComment>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<FileAsset> FileAssets => Set<FileAsset>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
@@ -525,6 +528,9 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.ContactNote).HasMaxLength(200);
             e.Property(x => x.AreaLabel).HasMaxLength(120);
             e.Property(x => x.AuthorDisplayName).HasMaxLength(200);
+            e.Property(x => x.AudienceBuildingIdsJson).HasColumnType("text");
+            e.Property(x => x.AudienceFloorIdsJson).HasColumnType("text");
+            e.Property(x => x.AudienceOccupancyRolesJson).HasColumnType("text");
             e.HasOne(x => x.HorizontalProperty)
                 .WithMany()
                 .HasForeignKey(x => x.HorizontalPropertyId)
@@ -535,6 +541,52 @@ public sealed class ApplicationDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.IsPinned, x.PublishedAtUtc });
             e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Kind, x.Category });
+        });
+
+        modelBuilder.Entity<MuralPostRead>(e =>
+        {
+            e.HasOne(x => x.MuralPost)
+                .WithMany()
+                .HasForeignKey(x => x.MuralPostId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Person)
+                .WithMany()
+                .HasForeignKey(x => x.PersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.MuralPostId, x.PersonId }).IsUnique();
+            e.HasIndex(x => x.MuralPostId);
+        });
+
+        modelBuilder.Entity<PqrsCase>(e =>
+        {
+            e.Property(x => x.Subject).HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(4000);
+            e.Property(x => x.AttachmentFileAssetIdsJson).HasColumnType("text");
+            e.HasOne(x => x.HorizontalProperty)
+                .WithMany()
+                .HasForeignKey(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Unit)
+                .WithMany()
+                .HasForeignKey(x => x.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.CreatedByPerson)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByPersonId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.CreatedByPersonId });
+        });
+
+        modelBuilder.Entity<PqrsComment>(e =>
+        {
+            e.Property(x => x.AuthorDisplayName).HasMaxLength(200);
+            e.Property(x => x.Body).HasMaxLength(4000);
+            e.HasOne(x => x.PqrsCase)
+                .WithMany(x => x.Comments)
+                .HasForeignKey(x => x.PqrsCaseId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.PqrsCaseId, x.PostedAtUtc });
         });
 
         modelBuilder.Entity<OutboxMessage>(e =>
@@ -667,6 +719,15 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<MuralPost>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<MuralPostRead>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<PqrsCase>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<PqrsComment>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<OutboxMessage>().HasQueryFilter(e =>

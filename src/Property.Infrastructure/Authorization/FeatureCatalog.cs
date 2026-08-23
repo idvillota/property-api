@@ -29,6 +29,8 @@ public static class FeatureCatalog
         new(Guid.Parse("f100002d-0033-4033-8033-00000000002d"), FeatureCodes.ReceptionManage, "Reception deliveries and messages", "Reception", 610),
         new(Guid.Parse("f1000033-0039-4039-8039-000000000033"), FeatureCodes.ReceptionVisits, "Reception visitor log", "Reception", 620),
         new(Guid.Parse("f1000030-0036-4036-8036-000000000030"), FeatureCodes.MuralManage, "Community mural notices", "Community", 530),
+        new(Guid.Parse("f1000038-003e-403e-803e-000000000038"), FeatureCodes.PqrsCreate, "Create PQRS (portal)", "Community", 540),
+        new(Guid.Parse("f1000039-003f-403f-803f-000000000039"), FeatureCodes.PqrsManage, "Manage PQRS inbox", "Community", 550),
         new(Guid.Parse("f100002e-0034-4034-8034-00000000002e"), FeatureCodes.ReportsView, "Reports", "Reports", 200),
         new(Guid.Parse("f1000031-0037-4037-8037-000000000031"), FeatureCodes.AuditView, "View audit trail", "Administration", 170),
         new(Guid.Parse("f1000032-0038-4038-8038-000000000032"), FeatureCodes.PortalAccess, "Resident/owner portal", "Portal", 20),
@@ -59,6 +61,7 @@ public static class FeatureCatalog
                 FeatureCodes.PortalReservations,
                 FeatureCodes.PortalPay,
                 FeatureCodes.PortalMuralRead,
+                FeatureCodes.PqrsCreate,
             ],
             [SystemRoles.Resident] =
             [
@@ -67,6 +70,7 @@ public static class FeatureCatalog
                 FeatureCodes.PortalReservations,
                 FeatureCodes.PortalPay,
                 FeatureCodes.PortalMuralRead,
+                FeatureCodes.PqrsCreate,
             ],
         };
 }

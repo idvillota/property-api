@@ -5,6 +5,7 @@ using Property.Application.Authorization;
 using Property.Application.Common.Interfaces;
 using Property.Application.Features.Billing.PaymentIntents;
 using Property.Application.Features.Community.Mural;
+using Property.Application.Features.Community.Pqrs;
 using Property.Application.Features.Organization.UserPersonLinks;
 using Property.Application.Features.Portal;
 
@@ -238,6 +239,97 @@ public sealed class PortalController : ControllerBase
         try
         {
             return Ok(await _portal.ListMuralPostsAsync(userId, cancellationToken));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Person link required for portal access." });
+        }
+    }
+
+    /// <summary>COM-011 — mark mural post as read for linked person.</summary>
+    [HttpPost("mural/{id:guid}/read")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalMuralRead)]
+    public async Task<ActionResult<MuralPostReadDto>> MarkMuralRead(Guid id, CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _portal.MarkMuralReadAsync(userId, id, cancellationToken));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Person link required for portal access." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>COM-012 — list caller's PQRS cases.</summary>
+    [HttpGet("pqrs")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PqrsCreate)]
+    public async Task<ActionResult<IReadOnlyList<PqrsCaseDto>>> ListMyPqrs(CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _portal.ListMyPqrsAsync(userId, cancellationToken));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Person link required for portal access." });
+        }
+    }
+
+    /// <summary>COM-012 — create PQRS for a linked unit.</summary>
+    [HttpPost("pqrs")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PqrsCreate)]
+    public async Task<ActionResult<PqrsCaseDto>> CreatePqrs(
+        [FromBody] CreatePortalPqrsDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            var created = await _portal.CreatePqrsAsync(userId, dto, cancellationToken);
+            return CreatedAtAction(nameof(GetMyPqrs), new { id = created.Id }, created);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>COM-012 — PQRS detail (excludes internal comments).</summary>
+    [HttpGet("pqrs/{id:guid}")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PqrsCreate)]
+    public async Task<ActionResult<PqrsCaseDto>> GetMyPqrs(Guid id, CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            var item = await _portal.GetMyPqrsAsync(userId, id, cancellationToken);
+            return item is null ? NotFound() : Ok(item);
         }
         catch (UnauthorizedAccessException)
         {

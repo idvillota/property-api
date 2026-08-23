@@ -1,5 +1,6 @@
 using Property.Application.Features.Billing.PaymentIntents;
 using Property.Application.Features.Community.Mural;
+using Property.Application.Features.Community.Pqrs;
 using Property.Application.Features.Organization.UserPersonLinks;
 using Property.Application.Features.Portal;
 
@@ -45,6 +46,25 @@ public interface IPortalService
 
     Task<IReadOnlyList<MuralPostDto>> ListMuralPostsAsync(
         Guid userId,
+        CancellationToken cancellationToken = default);
+
+    Task<MuralPostReadDto> MarkMuralReadAsync(
+        Guid userId,
+        Guid muralPostId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<PqrsCaseDto>> ListMyPqrsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    Task<PqrsCaseDto> CreatePqrsAsync(
+        Guid userId,
+        CreatePortalPqrsDto dto,
+        CancellationToken cancellationToken = default);
+
+    Task<PqrsCaseDto?> GetMyPqrsAsync(
+        Guid userId,
+        Guid id,
         CancellationToken cancellationToken = default);
 
     Task<PortalCheckoutDto> StartPaymentAsync(

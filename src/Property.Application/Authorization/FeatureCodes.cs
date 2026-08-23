@@ -23,6 +23,8 @@ public static class FeatureCodes
     public const string ReceptionManage = "reception.manage";
     public const string ReceptionVisits = "reception.visits";
     public const string MuralManage = "mural.manage";
+    public const string PqrsCreate = "pqrs.create";
+    public const string PqrsManage = "pqrs.manage";
     public const string ReportsView = "reports.view";
     public const string AuditView = "audit.view";
     public const string PortalAccess = "portal.access";
@@ -54,6 +56,8 @@ public static class FeatureCodes
         ReceptionManage,
         ReceptionVisits,
         MuralManage,
+        PqrsCreate,
+        PqrsManage,
         ReportsView,
         AuditView,
         PortalAccess,

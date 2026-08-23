@@ -25,6 +25,15 @@ public class MuralPost : EntityBase, ITenantScoped
     public DateTime? ExpiresAtUtc { get; set; }
     public bool IsActive { get; set; } = true;
 
+    /// <summary>JSON Guid[]; empty = all buildings.</summary>
+    public string AudienceBuildingIdsJson { get; set; } = "[]";
+
+    /// <summary>JSON Guid[]; empty = all floors.</summary>
+    public string AudienceFloorIdsJson { get; set; } = "[]";
+
+    /// <summary>JSON OccupancyRole[]; empty = all occupancy roles.</summary>
+    public string AudienceOccupancyRolesJson { get; set; } = "[]";
+
     public HorizontalProperty? HorizontalProperty { get; set; }
     public Unit? Unit { get; set; }
 }

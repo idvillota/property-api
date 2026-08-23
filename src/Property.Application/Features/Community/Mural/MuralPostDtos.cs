@@ -25,6 +25,35 @@ public sealed class MuralPostDto
     public DateTime? ExpiresAtUtc { get; set; }
     public bool IsActive { get; set; }
     public bool IsExpired { get; set; }
+
+    /// <summary>Empty = all buildings.</summary>
+    public IReadOnlyList<Guid> AudienceBuildingIds { get; set; } = Array.Empty<Guid>();
+
+    /// <summary>Empty = all floors.</summary>
+    public IReadOnlyList<Guid> AudienceFloorIds { get; set; } = Array.Empty<Guid>();
+
+    /// <summary>Empty = all occupancy roles.</summary>
+    public IReadOnlyList<OccupancyRole> AudienceOccupancyRoles { get; set; } = Array.Empty<OccupancyRole>();
+
+    public int ReadCount { get; set; }
+    public int RecipientCount { get; set; }
+    public decimal ReadPercent { get; set; }
+}
+
+public sealed class MuralPostReadDto
+{
+    public Guid MuralPostId { get; set; }
+    public Guid PersonId { get; set; }
+    public DateTime ReadAtUtc { get; set; }
+    public bool AlreadyRead { get; set; }
+}
+
+public sealed class MuralReadStatsDto
+{
+    public Guid MuralPostId { get; set; }
+    public int ReadCount { get; set; }
+    public int RecipientCount { get; set; }
+    public decimal ReadPercent { get; set; }
 }
 
 public sealed class CreateMuralPostDto
@@ -64,6 +93,12 @@ public sealed class CreateMuralPostDto
     public bool IsPinned { get; set; }
 
     public DateTime? ExpiresAtUtc { get; set; }
+
+    public IReadOnlyList<Guid>? AudienceBuildingIds { get; set; }
+
+    public IReadOnlyList<Guid>? AudienceFloorIds { get; set; }
+
+    public IReadOnlyList<OccupancyRole>? AudienceOccupancyRoles { get; set; }
 }
 
 public sealed class UpdateMuralPostDto
@@ -107,4 +142,36 @@ public sealed class UpdateMuralPostDto
     public DateTime? ExpiresAtUtc { get; set; }
 
     public bool IsActive { get; set; } = true;
+
+    public IReadOnlyList<Guid>? AudienceBuildingIds { get; set; }
+
+    public IReadOnlyList<Guid>? AudienceFloorIds { get; set; }
+
+    public IReadOnlyList<OccupancyRole>? AudienceOccupancyRoles { get; set; }
+}
+
+/// <summary>Reader membership used to filter portal mural feed.</summary>
+public sealed class MuralReaderScope
+{
+    public IReadOnlyCollection<Guid> BuildingIds { get; init; } = Array.Empty<Guid>();
+    public IReadOnlyCollection<Guid> FloorIds { get; init; } = Array.Empty<Guid>();
+    public IReadOnlyCollection<OccupancyRole> OccupancyRoles { get; init; } = Array.Empty<OccupancyRole>();
+}
+
+public sealed class MuralAudiencePreviewRequest
+{
+    [Required]
+    public Guid HorizontalPropertyId { get; set; }
+
+    public IReadOnlyList<Guid>? AudienceBuildingIds { get; set; }
+    public IReadOnlyList<Guid>? AudienceFloorIds { get; set; }
+    public IReadOnlyList<OccupancyRole>? AudienceOccupancyRoles { get; set; }
+}
+
+public sealed class MuralAudiencePreviewDto
+{
+    public int MatchingUnitCount { get; set; }
+    public int MatchingOccupancyCount { get; set; }
+    public bool IsBroadcast { get; set; }
+    public string Summary { get; set; } = string.Empty;
 }
