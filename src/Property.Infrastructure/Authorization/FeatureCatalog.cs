@@ -32,6 +32,7 @@ public static class FeatureCatalog
         new(Guid.Parse("f100002e-0034-4034-8034-00000000002e"), FeatureCodes.ReportsView, "Reports", "Reports", 200),
         new(Guid.Parse("f1000031-0037-4037-8037-000000000031"), FeatureCodes.AuditView, "View audit trail", "Administration", 170),
         new(Guid.Parse("f1000032-0038-4038-8038-000000000032"), FeatureCodes.PortalAccess, "Resident/owner portal", "Portal", 20),
+        new(Guid.Parse("f1000034-003a-403a-803a-000000000034"), FeatureCodes.PortalAccountRead, "Portal account statement", "Portal", 25),
     ];
 
     public static IReadOnlyDictionary<string, Guid> IdsByCode { get; } =
@@ -51,10 +52,12 @@ public static class FeatureCatalog
             [SystemRoles.Owner] =
             [
                 FeatureCodes.PortalAccess,
+                FeatureCodes.PortalAccountRead,
             ],
             [SystemRoles.Resident] =
             [
                 FeatureCodes.PortalAccess,
+                FeatureCodes.PortalAccountRead,
             ],
         };
 }

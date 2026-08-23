@@ -59,4 +59,48 @@ public sealed class PortalController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "Person link required for portal access." });
         }
     }
+
+    /// <summary>BIL-010 — estado de cuenta for linked units only.</summary>
+    [HttpGet("cuenta")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalAccountRead)]
+    public async Task<ActionResult<PortalAccountDto>> Cuenta(CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _portal.GetAccountAsync(userId, cancellationToken));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Person link required for portal access." });
+        }
+    }
+
+    /// <summary>BIL-010 — unit account detail (scoped).</summary>
+    [HttpGet("cuenta/units/{unitId:guid}")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalAccountRead)]
+    public async Task<ActionResult<PortalAccountUnitDetailDto>> CuentaUnit(
+        Guid unitId,
+        CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _portal.GetAccountUnitAsync(userId, unitId, cancellationToken));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

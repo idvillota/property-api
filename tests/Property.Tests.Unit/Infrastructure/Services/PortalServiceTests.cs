@@ -135,6 +135,103 @@ public sealed class PortalServiceTests
     }
 
     [Fact]
+    public async Task PortalAccount_ReturnsOnlyLinkedUnits()
+    {
+        using var fx = new TenantDbFixture();
+        var (user, person, unit, otherUnit) = await SeedLinkedAsync(fx);
+
+        var period = new BillingPeriod
+        {
+            Id = Guid.NewGuid(),
+            HorizontalPropertyId = (await fx.Db.HorizontalProperties.FirstAsync()).Id,
+            Year = 2026,
+            Month = 8,
+            Status = BillingPeriodStatus.Open,
+        };
+        fx.Db.BillingPeriods.Add(period);
+        fx.Db.FeeCharges.AddRange(
+            new FeeCharge
+            {
+                Id = Guid.NewGuid(),
+                HorizontalPropertyId = period.HorizontalPropertyId,
+                BillingPeriodId = period.Id,
+                UnitId = unit.Id,
+                ChargeType = FeeChargeType.Ordinary,
+                Description = "Cuota linked",
+                CoefficientSnapshot = 1m,
+                Amount = 100_000m,
+                AmountPaid = 0m,
+                DueDate = new DateOnly(2026, 8, 10),
+                Status = FeeChargeStatus.Pending,
+                IsActive = true,
+            },
+            new FeeCharge
+            {
+                Id = Guid.NewGuid(),
+                HorizontalPropertyId = period.HorizontalPropertyId,
+                BillingPeriodId = period.Id,
+                UnitId = otherUnit.Id,
+                ChargeType = FeeChargeType.Ordinary,
+                Description = "Cuota other",
+                CoefficientSnapshot = 1m,
+                Amount = 999_000m,
+                AmountPaid = 0m,
+                DueDate = new DateOnly(2026, 8, 10),
+                Status = FeeChargeStatus.Pending,
+                IsActive = true,
+            });
+        fx.Db.Payments.Add(new Payment
+        {
+            Id = Guid.NewGuid(),
+            HorizontalPropertyId = period.HorizontalPropertyId,
+            UnitId = otherUnit.Id,
+            PersonId = person.Id,
+            Amount = 50_000m,
+            PaidAt = DateTime.UtcNow.AddDays(-1),
+            Method = PaymentMethod.Cash,
+            IsActive = true,
+        });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = new PortalService(fx.Db, new UserPersonLinkService(fx.UnitOfWork, fx.Db, fx.TenantContext));
+        var account = await sut.GetAccountAsync(user.Id);
+
+        Assert.Single(account.Units);
+        Assert.Equal(unit.Id, account.Units[0].UnitId);
+        Assert.Equal(100_000m, account.OpenBalance);
+        Assert.DoesNotContain(account.Units, u => u.UnitId == otherUnit.Id);
+        Assert.Empty(account.RecentPayments);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            sut.GetAccountUnitAsync(user.Id, otherUnit.Id));
+
+        var detail = await sut.GetAccountUnitAsync(user.Id, unit.Id);
+        Assert.Equal(unit.Id, detail.UnitId);
+        Assert.Single(detail.OpenCharges);
+        Assert.Equal(100_000m, detail.OpenBalance);
+    }
+
+    [Fact]
+    public async Task PortalAccount_Forbidden_WithoutPersonLink()
+    {
+        using var fx = new TenantDbFixture();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = "nolink@example.com",
+            NormalizedEmail = "NOLINK@EXAMPLE.COM",
+            PasswordHash = "x",
+        };
+        fx.Db.Users.Add(user);
+        fx.Db.TenantUsers.Add(new TenantUser { Id = Guid.NewGuid(), UserId = user.Id, IsActive = true });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = new PortalService(fx.Db, new UserPersonLinkService(fx.UnitOfWork, fx.Db, fx.TenantContext));
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => sut.GetAccountAsync(user.Id));
+    }
+
+    [Fact]
     public void Portal_Forbidden_WhenModuleOff()
     {
         var attr = typeof(PortalController).GetCustomAttribute<RequireTenantModuleAttribute>();
