@@ -16,8 +16,12 @@ public class Payment : EntityBase, ITenantScoped
     public string? Notes { get; set; }
     public bool IsActive { get; set; } = true;
 
+    /// <summary>Generated cash receipt PDF (BIL-013).</summary>
+    public Guid? ReceiptFileAssetId { get; set; }
+
     public HorizontalProperty? HorizontalProperty { get; set; }
     public Unit? Unit { get; set; }
     public Person? Person { get; set; }
+    public FileAsset? ReceiptFileAsset { get; set; }
     public ICollection<PaymentAllocation> Allocations { get; set; } = new List<PaymentAllocation>();
 }

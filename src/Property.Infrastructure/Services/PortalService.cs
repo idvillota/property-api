@@ -150,6 +150,7 @@ public sealed class PortalService : IPortalService
                     Amount = pay.Amount,
                     PaidAt = pay.PaidAt,
                     Method = pay.Method,
+                    HasReceipt = pay.ReceiptFileAssetId != null,
                 }
             ).Take(20).ToListAsync(cancellationToken);
 
@@ -215,6 +216,7 @@ public sealed class PortalService : IPortalService
                 Amount = pay.Amount,
                 PaidAt = pay.PaidAt,
                 Method = pay.Method,
+                HasReceipt = pay.ReceiptFileAssetId != null,
             }
         ).Take(20).ToListAsync(cancellationToken);
 
@@ -226,6 +228,35 @@ public sealed class PortalService : IPortalService
             OverdueBalance = openCharges.Where(c => c.DueDate < today).Sum(c => c.Balance),
             OpenCharges = openCharges,
             RecentPayments = recentPayments,
+        };
+    }
+
+    public async Task<PortalAccountPaymentDto?> GetAccountPaymentAsync(
+        Guid userId,
+        Guid paymentId,
+        CancellationToken cancellationToken = default)
+    {
+        var payment = await (
+            from pay in _db.Payments.AsNoTracking()
+            join u in _db.Units.AsNoTracking() on pay.UnitId equals u.Id
+            where pay.Id == paymentId && pay.IsActive
+            select new { pay, u.Code }
+        ).FirstOrDefaultAsync(cancellationToken);
+        if (payment is null)
+            return null;
+
+        if (!await IsUnitInScopeAsync(userId, payment.pay.UnitId, cancellationToken))
+            throw new UnauthorizedAccessException("Unit is not in portal scope.");
+
+        return new PortalAccountPaymentDto
+        {
+            PaymentId = payment.pay.Id,
+            UnitId = payment.pay.UnitId,
+            UnitCode = payment.Code,
+            Amount = payment.pay.Amount,
+            PaidAt = payment.pay.PaidAt,
+            Method = payment.pay.Method,
+            HasReceipt = payment.pay.ReceiptFileAssetId != null,
         };
     }
 

@@ -23,17 +23,20 @@ public sealed class PaymentIntentService : IPaymentIntentService
 
     private readonly ApplicationDbContext _db;
     private readonly IPaymentService _payments;
+    private readonly IPaymentReceiptService _receipts;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IOutboxWriter _outbox;
 
     public PaymentIntentService(
         ApplicationDbContext db,
         IPaymentService payments,
+        IPaymentReceiptService receipts,
         IUnitOfWork unitOfWork,
         IOutboxWriter outbox)
     {
         _db = db;
         _payments = payments;
+        _receipts = receipts;
         _unitOfWork = unitOfWork;
         _outbox = outbox;
     }
@@ -203,6 +206,15 @@ public sealed class PaymentIntentService : IPaymentIntentService
                     .ToList(),
             },
             cancellationToken);
+
+        try
+        {
+            await _receipts.EnsureReceiptAsync(payment.Id, enqueueEmailIfEnabled: true, cancellationToken);
+        }
+        catch
+        {
+            // Receipt/email must not roll back a successful payment.
+        }
 
         entity = await _db.PaymentIntents.FirstAsync(i => i.Id == id, cancellationToken);
         if (entity.Status == PaymentIntentStatus.Paid && entity.PaymentId.HasValue)

@@ -26,6 +26,9 @@ public sealed class PaymentDto
 
     /// <summary>Open charge balance for the unit after create (BIL-004). Zero on list/get.</summary>
     public decimal UnitOpenBalanceAfter { get; set; }
+
+    /// <summary>Receipt PDF FileAsset id when generated (BIL-013).</summary>
+    public Guid? ReceiptFileAssetId { get; set; }
 }
 
 public sealed class CreatePaymentAllocationDto

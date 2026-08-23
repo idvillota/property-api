@@ -300,6 +300,7 @@ public sealed class PaymentService : IPaymentService
             Notes = entity.Notes,
             IsActive = entity.IsActive,
             UnitOpenBalanceAfter = unitOpenBalanceAfter,
+            ReceiptFileAssetId = entity.ReceiptFileAssetId,
             Allocations = entity.Allocations
                 .Select(a => new PaymentAllocationDto
                 {

@@ -18,6 +18,7 @@ public sealed class UnitService : IUnitService
     private readonly IRepository<UnitOccupancy> _occupancies;
     private readonly IRepository<Person> _people;
     private readonly IRepository<Vehicle> _vehicles;
+    private readonly IRepository<FeeCharge> _charges;
     private readonly IUnitOfWork _unitOfWork;
 
     public UnitService(
@@ -28,6 +29,7 @@ public sealed class UnitService : IUnitService
         IRepository<UnitOccupancy> occupancies,
         IRepository<Person> people,
         IRepository<Vehicle> vehicles,
+        IRepository<FeeCharge> charges,
         IUnitOfWork unitOfWork)
     {
         _units = units;
@@ -37,6 +39,7 @@ public sealed class UnitService : IUnitService
         _occupancies = occupancies;
         _people = people;
         _vehicles = vehicles;
+        _charges = charges;
         _unitOfWork = unitOfWork;
     }
 
@@ -402,6 +405,20 @@ public sealed class UnitService : IUnitService
             .Select(u => new UnitAmenityLinkDto { UnitId = u.Id, Code = u.Code })
             .ToList();
 
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var openRows = await _charges.Query().AsNoTracking()
+            .Where(c =>
+                c.UnitId == unitId &&
+                c.IsActive &&
+                (c.Status == FeeChargeStatus.Pending || c.Status == FeeChargeStatus.Partial))
+            .Select(c => new { Balance = c.Amount - c.AmountPaid, c.DueDate })
+            .ToListAsync(cancellationToken);
+        var openBalance = Math.Round(openRows.Sum(r => r.Balance), 2, MidpointRounding.AwayFromZero);
+        var overdueBalance = Math.Round(
+            openRows.Where(r => r.DueDate < today).Sum(r => r.Balance),
+            2,
+            MidpointRounding.AwayFromZero);
+
         return new UnitHouseholdDto
         {
             UnitId = unit.Id,
@@ -421,6 +438,8 @@ public sealed class UnitService : IUnitService
             RelatedParkings = relatedParkings,
             RelatedTerraces = relatedTerraces,
             RelatedStorages = relatedStorages,
+            OpenBalance = openBalance,
+            OverdueBalance = overdueBalance,
         };
     }
 

@@ -20,6 +20,11 @@ public interface IPortalService
         Guid unitId,
         CancellationToken cancellationToken = default);
 
+    Task<PortalAccountPaymentDto?> GetAccountPaymentAsync(
+        Guid userId,
+        Guid paymentId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<PortalCommonAreaDto>> ListReservationAreasAsync(
         Guid userId,
         CancellationToken cancellationToken = default);

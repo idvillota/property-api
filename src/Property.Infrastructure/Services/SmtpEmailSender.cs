@@ -18,7 +18,12 @@ public sealed class SmtpEmailSender : IEmailSender
         _logger = logger;
     }
 
-    public async Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken cancellationToken = default)
+    public async Task SendAsync(
+        string toEmail,
+        string subject,
+        string htmlBody,
+        IReadOnlyList<EmailAttachment>? attachments = null,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(toEmail))
             return;
@@ -26,9 +31,10 @@ public sealed class SmtpEmailSender : IEmailSender
         if (!_options.Enabled)
         {
             _logger.LogInformation(
-                "Email disabled. Would send to {To}: {Subject}\n{Body}",
+                "Email disabled. Would send to {To}: {Subject} (attachments: {Count})\n{Body}",
                 toEmail,
                 subject,
+                attachments?.Count ?? 0,
                 htmlBody);
             return;
         }
@@ -41,6 +47,15 @@ public sealed class SmtpEmailSender : IEmailSender
             IsBodyHtml = true,
         };
         message.To.Add(toEmail.Trim());
+
+        if (attachments is not null)
+        {
+            foreach (var attachment in attachments)
+            {
+                var stream = new MemoryStream(attachment.Content);
+                message.Attachments.Add(new Attachment(stream, attachment.FileName, attachment.ContentType));
+            }
+        }
 
         using var client = new SmtpClient(_options.Host, _options.Port)
         {

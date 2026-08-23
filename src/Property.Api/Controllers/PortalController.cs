@@ -20,11 +20,16 @@ namespace Property.Api.Controllers;
 public sealed class PortalController : ControllerBase
 {
     private readonly IPortalService _portal;
+    private readonly IPaymentReceiptService _receipts;
     private readonly ICurrentTenantContext _tenant;
 
-    public PortalController(IPortalService portal, ICurrentTenantContext tenant)
+    public PortalController(
+        IPortalService portal,
+        IPaymentReceiptService receipts,
+        ICurrentTenantContext tenant)
     {
         _portal = portal;
+        _receipts = receipts;
         _tenant = tenant;
     }
 
@@ -97,6 +102,38 @@ public sealed class PortalController : ControllerBase
         try
         {
             return Ok(await _portal.GetAccountUnitAsync(userId, unitId, cancellationToken));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>BIL-013 — download cash receipt PDF for a payment in portal scope.</summary>
+    [HttpGet("cuenta/pagos/{paymentId:guid}/receipt")]
+    [RequirePersonLink]
+    [RequireFeature(FeatureCodes.PortalAccountRead)]
+    public async Task<IActionResult> DownloadPaymentReceipt(
+        Guid paymentId,
+        CancellationToken cancellationToken)
+    {
+        if (_tenant.UserId is not Guid userId)
+            return Unauthorized();
+
+        try
+        {
+            var payment = await _portal.GetAccountPaymentAsync(userId, paymentId, cancellationToken);
+            if (payment is null)
+                return NotFound();
+
+            var result = await _receipts.DownloadReceiptAsync(paymentId, cancellationToken);
+            if (result is null)
+                return NotFound();
+            return File(result.Content, result.Asset.ContentType, result.Asset.FileName);
         }
         catch (UnauthorizedAccessException ex)
         {

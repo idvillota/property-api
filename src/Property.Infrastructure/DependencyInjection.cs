@@ -58,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<IBillingPeriodService, BillingPeriodService>();
         services.AddScoped<IFeeChargeService, FeeChargeService>();
         services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<IPaymentReceiptService, PaymentReceiptService>();
         services.AddScoped<IPaymentIntentService, PaymentIntentService>();
         services.Configure<WompiOptions>(configuration.GetSection(WompiOptions.SectionName));
         services.Configure<DunningOptions>(configuration.GetSection(DunningOptions.SectionName));

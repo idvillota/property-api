@@ -13,8 +13,13 @@ namespace Property.Api.Controllers;
 public sealed class PaymentsController : ControllerBase
 {
     private readonly IPaymentService _service;
+    private readonly IPaymentReceiptService _receipts;
 
-    public PaymentsController(IPaymentService service) => _service = service;
+    public PaymentsController(IPaymentService service, IPaymentReceiptService receipts)
+    {
+        _service = service;
+        _receipts = receipts;
+    }
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<PaymentDto>>> List(
@@ -29,6 +34,22 @@ public sealed class PaymentsController : ControllerBase
         return item is null ? NotFound() : Ok(item);
     }
 
+    [HttpGet("{id:guid}/receipt")]
+    public async Task<IActionResult> DownloadReceipt(Guid id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _receipts.DownloadReceiptAsync(id, cancellationToken);
+            if (result is null)
+                return NotFound();
+            return File(result.Content, result.Asset.ContentType, result.Asset.FileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPost]
     public async Task<ActionResult<PaymentDto>> Create(
         [FromBody] CreatePaymentDto dto,
@@ -40,7 +61,9 @@ public sealed class PaymentsController : ControllerBase
         try
         {
             var created = await _service.CreateAsync(dto, cancellationToken);
-            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+            await _receipts.EnsureReceiptAsync(created.Id, enqueueEmailIfEnabled: true, cancellationToken);
+            var withReceipt = await _service.GetByIdAsync(created.Id, cancellationToken) ?? created;
+            return CreatedAtAction(nameof(GetById), new { id = withReceipt.Id }, withReceipt);
         }
         catch (InvalidOperationException ex)
         {

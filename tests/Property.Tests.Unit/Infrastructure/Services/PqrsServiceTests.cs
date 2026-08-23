@@ -222,6 +222,7 @@ public sealed class PqrsServiceTests
         var intents = new PaymentIntentService(
             fx.Db,
             payments,
+            new Property.Application.Common.Interfaces.NullPaymentReceiptService(),
             fx.UnitOfWork,
             new OutboxWriter(
                 fx.Db,

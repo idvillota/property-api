@@ -51,4 +51,10 @@ public sealed class UnitHouseholdDto
 
     /// <summary>Storage units linked to this dwelling via LinkedUnitId.</summary>
     public IReadOnlyList<UnitAmenityLinkDto> RelatedStorages { get; set; } = Array.Empty<UnitAmenityLinkDto>();
+
+    /// <summary>Open FeeCharge balance (Pending|Partial) — DIFF-008.</summary>
+    public decimal OpenBalance { get; set; }
+
+    /// <summary>Open balance past due date.</summary>
+    public decimal OverdueBalance { get; set; }
 }

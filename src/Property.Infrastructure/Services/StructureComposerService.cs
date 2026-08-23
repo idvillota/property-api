@@ -183,7 +183,9 @@ public sealed class StructureComposerService : IStructureComposerService
         var codeToUnitId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         Guid? firstBuildingId = null;
 
-        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+        await using var tx = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
 
         foreach (var buildingPlan in plan.Buildings)
         {
@@ -276,7 +278,8 @@ public sealed class StructureComposerService : IStructureComposerService
 
         CoefficientCalculator.ApplyAreaProportional(units);
         await _db.SaveChangesAsync(cancellationToken);
-        await tx.CommitAsync(cancellationToken);
+        if (tx is not null)
+            await tx.CommitAsync(cancellationToken);
 
         return new StructureComposerCommitResultDto
         {

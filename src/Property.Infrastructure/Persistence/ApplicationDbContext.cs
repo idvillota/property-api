@@ -340,6 +340,10 @@ public sealed class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.PersonId)
                 .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ReceiptFileAsset)
+                .WithMany()
+                .HasForeignKey(x => x.ReceiptFileAssetId)
+                .OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.UnitId });
         });
 

@@ -80,6 +80,7 @@ public sealed class PaymentIntentServiceTests
                 fx.Repository<Person>(),
                 fx.UnitOfWork,
                 new Property.Infrastructure.Auditing.AuditWriter(fx.Db, fx.TenantContext)),
+            new Property.Application.Common.Interfaces.NullPaymentReceiptService(),
             fx.UnitOfWork,
             new Property.Infrastructure.Messaging.OutboxWriter(
                 fx.Db,

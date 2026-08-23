@@ -31,6 +31,7 @@ public sealed class PortalServiceTests
         var intents = new PaymentIntentService(
             fx.Db,
             payments,
+            new Property.Application.Common.Interfaces.NullPaymentReceiptService(),
             fx.UnitOfWork,
             new Property.Infrastructure.Messaging.OutboxWriter(
                 fx.Db,

@@ -56,6 +56,7 @@ public sealed class PortalAccountPaymentDto
     public decimal Amount { get; set; }
     public DateTime PaidAt { get; set; }
     public PaymentMethod Method { get; set; }
+    public bool HasReceipt { get; set; }
 }
 
 public sealed class PortalAccountUnitDetailDto

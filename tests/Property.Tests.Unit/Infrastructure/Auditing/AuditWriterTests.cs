@@ -70,6 +70,13 @@ public sealed class AuditWriterTests
     }
 
     [Fact]
+    public async Task Audit_Written_OnRoleChange()
+    {
+        // Spec ORG-010 alias of AuditWriter_OnRolePermissionChange
+        await AuditWriter_OnRolePermissionChange();
+    }
+
+    [Fact]
     public void AuditEvent_NoHardDeleteApi()
     {
         var controller = typeof(AuditEventsController);
@@ -92,5 +99,12 @@ public sealed class AuditWriterTests
             .ToList();
 
         Assert.Empty(deleteRoutes);
+    }
+
+    [Fact]
+    public void Audit_NoDeleteEndpoint()
+    {
+        // Spec ORG-010 alias
+        AuditEvent_NoHardDeleteApi();
     }
 }

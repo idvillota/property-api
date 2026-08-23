@@ -6,7 +6,6 @@ using Property.Application.Features.Platform.Audit;
 
 namespace Property.Api.Controllers;
 
-/// <summary>Read-only audit trail (ARCH-006). Full UI is ORG-010. No update/delete endpoints.</summary>
 [ApiController]
 [RequireFeature(FeatureCodes.AuditView)]
 [Route("api/audit-events")]
@@ -18,16 +17,31 @@ public sealed class AuditEventsController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<AuditEventDto>>> List(
+        [FromQuery] Guid? actorUserId = null,
+        [FromQuery] string? entityType = null,
+        [FromQuery] string? entityId = null,
+        [FromQuery] DateTime? fromUtc = null,
+        [FromQuery] DateTime? toUtc = null,
         [FromQuery] int take = 50,
         CancellationToken cancellationToken = default) =>
-        Ok(await _query.ListRecentAsync(take, cancellationToken));
+        Ok(await _query.ListAsync(
+            new AuditEventListQuery
+            {
+                ActorUserId = actorUserId,
+                EntityType = entityType,
+                EntityId = entityId,
+                FromUtc = fromUtc,
+                ToUtc = toUtc,
+                Take = take,
+            },
+            cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<AuditEventDto>> GetById(
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var match = await _query.GetByIdAsync(id, cancellationToken);
-        return match is null ? NotFound() : Ok(match);
+        var item = await _query.GetByIdAsync(id, cancellationToken);
+        return item is null ? NotFound() : Ok(item);
     }
 }

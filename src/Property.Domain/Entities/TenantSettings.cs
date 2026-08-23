@@ -31,5 +31,8 @@ public class TenantSettings : ITenantScoped
 
     public bool ModuleAssembliesEnabled { get; set; }
 
+    /// <summary>When true, enqueue receipt PDF email after payment confirm (BIL-013).</summary>
+    public bool EmailReceiptOnPaymentEnabled { get; set; } = true;
+
     public Tenant Tenant { get; set; } = null!;
 }

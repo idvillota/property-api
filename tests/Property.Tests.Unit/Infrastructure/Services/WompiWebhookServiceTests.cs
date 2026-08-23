@@ -106,6 +106,7 @@ public sealed class WompiWebhookServiceTests
                 fx.Repository<Person>(),
                 fx.UnitOfWork,
                 new AuditWriter(fx.Db, fx.TenantContext)),
+            new Property.Application.Common.Interfaces.NullPaymentReceiptService(),
             fx.UnitOfWork,
             new OutboxWriter(fx.Db, fx.TenantContext, Options.Create(new OutboxOptions())));
 
