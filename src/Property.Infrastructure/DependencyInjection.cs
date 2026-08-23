@@ -52,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<IPersonService, PersonService>();
         services.AddScoped<IUnitOccupancyService, UnitOccupancyService>();
         services.AddScoped<IUserPersonLinkService, UserPersonLinkService>();
+        services.AddScoped<IPortalService, PortalService>();
         services.AddScoped<IFeeSettingsService, FeeSettingsService>();
         services.AddScoped<IBillingPeriodService, BillingPeriodService>();
         services.AddScoped<IFeeChargeService, FeeChargeService>();

@@ -24,6 +24,7 @@ public static class FeatureCodes
     public const string MuralManage = "mural.manage";
     public const string ReportsView = "reports.view";
     public const string AuditView = "audit.view";
+    public const string PortalAccess = "portal.access";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -49,5 +50,6 @@ public static class FeatureCodes
         MuralManage,
         ReportsView,
         AuditView,
+        PortalAccess,
     ];
 }

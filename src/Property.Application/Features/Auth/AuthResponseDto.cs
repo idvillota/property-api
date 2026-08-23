@@ -17,4 +17,9 @@ public sealed class AuthResponseDto
     public string ColorScheme { get; set; } = string.Empty;
     /// <summary>Tenant commercial modules (ARCH-002). Independent of RBAC FeatureCodes.</summary>
     public TenantModuleFlagsDto Modules { get; set; } = new();
+
+    /// <summary>True when the user has an active UserPersonLink in this tenant (PRT-001).</summary>
+    public bool HasPersonLink { get; set; }
+
+    public IReadOnlyList<Guid> UnitIds { get; set; } = Array.Empty<Guid>();
 }

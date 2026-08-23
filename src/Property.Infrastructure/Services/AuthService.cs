@@ -77,6 +77,8 @@ public sealed class AuthService : IAuthService
             NewRole(tenant.Id, SystemRoles.Administrator),
             NewRole(tenant.Id, SystemRoles.Manager),
             NewRole(tenant.Id, SystemRoles.Receptionist),
+            NewRole(tenant.Id, SystemRoles.Owner),
+            NewRole(tenant.Id, SystemRoles.Resident),
         };
 
         var tenantUser = new TenantUser
@@ -133,6 +135,8 @@ public sealed class AuthService : IAuthService
             BrandTheme = UserPreferences.NormalizeBrandTheme(tenantUser.BrandTheme),
             ColorScheme = UserPreferences.NormalizeColorScheme(tenantUser.ColorScheme),
             Modules = modules,
+            HasPersonLink = false,
+            UnitIds = Array.Empty<Guid>(),
         };
     }
 
@@ -212,6 +216,8 @@ public sealed class AuthService : IAuthService
             BrandTheme = UserPreferences.NormalizeBrandTheme(membership.BrandTheme),
             ColorScheme = UserPreferences.NormalizeColorScheme(membership.ColorScheme),
             Modules = modules,
+            HasPersonLink = personId is not null,
+            UnitIds = unitIds,
         };
     }
 

@@ -10,7 +10,6 @@ public sealed class RolePermissionExpectationsTests
 {
     [Theory]
     [InlineData(SystemRoles.Administrator)]
-    [InlineData(SystemRoles.Owner)]
     [InlineData(SystemRoles.Manager)]
     public void Platform_roles_receive_all_features(string roleName)
     {
@@ -20,10 +19,20 @@ public sealed class RolePermissionExpectationsTests
             Assert.Contains(code, permissions);
     }
 
-    [Fact]
-    public void Every_default_role_includes_dashboard_view()
+    [Theory]
+    [InlineData(SystemRoles.Owner)]
+    [InlineData(SystemRoles.Resident)]
+    public void Portal_roles_receive_portal_access_only(string roleName)
     {
-        foreach (var roleName in SystemRoles.All)
+        var permissions = FeatureCatalog.DefaultFeaturesByRole[roleName];
+        Assert.Single(permissions);
+        Assert.Contains(FeatureCodes.PortalAccess, permissions);
+    }
+
+    [Fact]
+    public void Operational_roles_include_dashboard_view()
+    {
+        foreach (var roleName in SystemRoles.All.Where(r => !SystemRoles.PortalRoles.Contains(r)))
         {
             var permissions = Permissions(roleName);
             Assert.Contains(FeatureCodes.DashboardView, permissions);

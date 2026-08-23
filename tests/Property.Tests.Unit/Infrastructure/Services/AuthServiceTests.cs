@@ -93,7 +93,7 @@ public sealed class AuthServiceTests
         Assert.Equal("owner@example.com", result.Email);
         Assert.Single(await fx.Db.Tenants.ToListAsync());
         Assert.Single(await fx.Db.Users.ToListAsync());
-        Assert.Equal(3, await fx.Db.Roles.CountAsync());
+        Assert.Equal(5, await fx.Db.Roles.CountAsync());
         Assert.Single(await fx.Db.TenantUsers.ToListAsync());
         Assert.NotNull(result.Modules);
         Assert.True(result.Modules.Portal);
