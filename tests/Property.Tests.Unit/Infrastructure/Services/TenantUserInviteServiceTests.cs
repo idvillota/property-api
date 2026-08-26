@@ -38,6 +38,27 @@ public sealed class TenantUserInviteServiceTests
         new(fx.UnitOfWork, fx.TenantContext, new BcryptPasswordHasher());
 
     [Fact]
+    public async Task ListAsync_returns_members_of_current_tenant()
+    {
+        using var fx = new TenantDbFixture();
+        await SeedTenantWithRolesAsync(fx);
+        var sut = CreateSut(fx);
+
+        await sut.InviteAsync(
+            new InviteTenantUserDto
+            {
+                Email = "manager@example.com",
+                Password = "Str0ng!Pass",
+                DisplayName = "Demo Manager",
+                Role = "Manager",
+            });
+
+        var list = await sut.ListAsync();
+
+        Assert.Contains(list, u => u.Email == "manager@example.com" && u.Roles.Contains("Manager"));
+    }
+
+    [Fact]
     public async Task InviteAsync_creates_user_membership_and_manager_role()
     {
         using var fx = new TenantDbFixture();

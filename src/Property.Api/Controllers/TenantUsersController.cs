@@ -15,6 +15,12 @@ public sealed class TenantUsersController : ControllerBase
 
     public TenantUsersController(ITenantUserInviteService inviteService) => _inviteService = inviteService;
 
+    /// <summary>Lists users that belong to the current tenant (Equipo).</summary>
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<TenantUserListItemDto>>> List(
+        CancellationToken cancellationToken = default) =>
+        Ok(await _inviteService.ListAsync(cancellationToken));
+
     /// <summary>Adds a user to the current tenant (new account or existing global user not yet in this tenant).</summary>
     [HttpPost("invite")]
     public async Task<ActionResult<InvitedTenantUserDto>> Invite(

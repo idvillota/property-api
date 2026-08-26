@@ -22,6 +22,38 @@ public sealed class TenantUserInviteService : ITenantUserInviteService
         _passwordHasher = passwordHasher;
     }
 
+    public async Task<IReadOnlyList<TenantUserListItemDto>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_tenantContext.TenantId.HasValue)
+            throw new InvalidOperationException("Tenant context is not set.");
+
+        var tenantId = _tenantContext.TenantId.Value;
+        var rows = await _unitOfWork.Repository<TenantUser>().Query().AsNoTracking()
+            .Where(tu => tu.TenantId == tenantId)
+            .Include(tu => tu.User)
+            .Include(tu => tu.TenantUserRoles)
+            .ThenInclude(tur => tur.Role)
+            .OrderBy(tu => tu.User!.Email)
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(tu => new TenantUserListItemDto
+            {
+                TenantUserId = tu.Id,
+                UserId = tu.UserId,
+                Email = tu.User?.Email ?? string.Empty,
+                DisplayName = tu.User?.DisplayName,
+                IsActive = tu.IsActive,
+                Roles = tu.TenantUserRoles
+                    .Select(tur => tur.Role?.Name ?? string.Empty)
+                    .Where(n => n.Length > 0)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(n => n, StringComparer.Ordinal)
+                    .ToList(),
+                CreatedAtUtc = tu.CreatedAtUtc,
+            })
+            .ToList();
+    }
+
     public async Task<InvitedTenantUserDto> InviteAsync(InviteTenantUserDto dto, CancellationToken cancellationToken = default)
     {
         if (!_tenantContext.TenantId.HasValue)

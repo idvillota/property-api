@@ -121,6 +121,23 @@ using (var scope = app.Services.CreateScope())
             currentTenant,
             permissionLogger,
             CancellationToken.None);
+
+        var coa = scope.ServiceProvider.GetRequiredService<IChartOfAccountsService>();
+        try
+        {
+            await DevelopmentExtendedDemoSeeder.EnsureAsync(
+                db,
+                passwordHasher,
+                coa,
+                permissionLogger,
+                CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            permissionLogger.LogError(
+                ex,
+                "Extended demo seed failed; API will continue. Fix seed data or reset the local database.");
+        }
     }
 }
 

@@ -33,7 +33,11 @@ public static class DependencyInjection
 
         services.AddDbContext<ApplicationDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
-                npgsql.EnableRetryOnFailure(maxRetryCount: 3)));
+                    npgsql.EnableRetryOnFailure(maxRetryCount: 3))
+                // Hand-written migrations under Persistence/Migrations update schema without
+                // regenerating Designers; ignore pending-model check until a Sync snapshot runs.
+                .ConfigureWarnings(w =>
+                    w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();

@@ -15,6 +15,30 @@ public sealed class TenantUsersControllerTests
     public TenantUsersControllerTests() => _controller = new TenantUsersController(_service.Object);
 
     [Fact]
+    public async Task List_returns_ok()
+    {
+        var items = new List<TenantUserListItemDto>
+        {
+            new()
+            {
+                TenantUserId = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                Email = "admin@example.com",
+                Roles = ["Administrator"],
+                IsActive = true,
+            },
+        };
+        _service.Setup(s => s.ListAsync(default)).ReturnsAsync(items);
+
+        var result = await _controller.List();
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var body = Assert.IsAssignableFrom<IReadOnlyList<TenantUserListItemDto>>(ok.Value);
+        Assert.Single(body);
+        Assert.Equal("admin@example.com", body[0].Email);
+    }
+
+    [Fact]
     public async Task Invite_returns_201_when_successful()
     {
         var dto = new InvitedTenantUserDto

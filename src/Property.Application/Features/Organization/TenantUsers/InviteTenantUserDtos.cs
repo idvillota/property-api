@@ -19,9 +19,9 @@ public sealed class InviteTenantUserDto
     [MaxLength(200)]
     public string? DisplayName { get; set; }
 
-    /// <summary>Manager (Administrator cannot be assigned via invite).</summary>
+    /// <summary>Manager or Accountant (Administrator cannot be assigned via invite).</summary>
     [Required]
-    [RegularExpression("^(Manager)$", ErrorMessage = "Role must be Manager.")]
+    [RegularExpression("^(Manager|Accountant)$", ErrorMessage = "Role must be Manager or Accountant.")]
     public string Role { get; set; } = string.Empty;
 }
 
@@ -31,4 +31,16 @@ public sealed class InvitedTenantUserDto
     public Guid TenantUserId { get; set; }
     public string Email { get; set; } = string.Empty;
     public IReadOnlyList<string> Roles { get; set; } = Array.Empty<string>();
+}
+
+/// <summary>Member of the current tenant (Equipo list).</summary>
+public sealed class TenantUserListItemDto
+{
+    public Guid TenantUserId { get; set; }
+    public Guid UserId { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string? DisplayName { get; set; }
+    public bool IsActive { get; set; }
+    public IReadOnlyList<string> Roles { get; set; } = Array.Empty<string>();
+    public DateTime CreatedAtUtc { get; set; }
 }
