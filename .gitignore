@@ -37,6 +37,10 @@ msbuild.wrn
 appsettings.dev.json
 appsettings.local.json
 appsettings.Production.json
+**/appsettings.*.local.json
+.env
+.env.*
+!.env*.example
 
 # Local-only secrets (connection strings, tokens)
 .local/
