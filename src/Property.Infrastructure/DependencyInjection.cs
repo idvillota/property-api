@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<INeighborhoodService, NeighborhoodService>();
         services.AddScoped<IHorizontalPropertyService, HorizontalPropertyService>();
         services.AddScoped<IHoldingService, HoldingService>();
+        services.AddScoped<StructureNodeRemoval>();
         services.AddScoped<IBuildingService, BuildingService>();
         services.AddScoped<IVehicleService, VehicleService>();
         services.AddScoped<IVehicleBrandService, VehicleBrandService>();

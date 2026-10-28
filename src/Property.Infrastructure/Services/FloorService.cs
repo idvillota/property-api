@@ -12,15 +12,18 @@ public sealed class FloorService : IFloorService
     private readonly IRepository<Floor> _floors;
     private readonly IRepository<Building> _buildings;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly StructureNodeRemoval _removal;
 
     public FloorService(
         IRepository<Floor> floors,
         IRepository<Building> buildings,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        StructureNodeRemoval removal)
     {
         _floors = floors;
         _buildings = buildings;
         _unitOfWork = unitOfWork;
+        _removal = removal;
     }
 
     public Task<PagedResult<FloorDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
@@ -73,17 +76,8 @@ public sealed class FloorService : IFloorService
         return Map(entity);
     }
 
-    public async Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        var entity = await _floors.GetByIdAsync(id, cancellationToken);
-        if (entity is null || !entity.IsActive)
-            return false;
-
-        entity.IsActive = false;
-        _floors.Update(entity);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return true;
-    }
+    public Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
+        _removal.RemoveFloorAsync(id, cancellationToken);
 
     private async Task EnsureBuildingAsync(Guid buildingId, CancellationToken cancellationToken)
     {
