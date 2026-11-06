@@ -54,6 +54,7 @@ public sealed class FeatureAuthorizationTests
     [InlineData(typeof(PeopleController), FeatureCodes.PeopleManage)]
     [InlineData(typeof(UnitOccupanciesController), FeatureCodes.PeopleManage)]
     [InlineData(typeof(FeeSettingsController), FeatureCodes.BillingSettings)]
+    [InlineData(typeof(BreBPaymentProfilesController), FeatureCodes.BillingSettings)]
     [InlineData(typeof(BillingPeriodsController), FeatureCodes.BillingCharges)]
     [InlineData(typeof(FeeChargesController), FeatureCodes.BillingCharges)]
     [InlineData(typeof(PaymentsController), FeatureCodes.BillingPayments)]

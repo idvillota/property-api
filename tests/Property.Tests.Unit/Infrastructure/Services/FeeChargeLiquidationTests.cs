@@ -1,7 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Property.Application.Common.Interfaces;
+using Property.Application.Features.Billing.BreB;
 using Property.Application.Features.Billing.FeeCharges;
+using Property.Application.Messaging;
 using Property.Domain.Entities;
 using Property.Domain.Enums;
+using Property.Infrastructure.Messaging;
 using Property.Infrastructure.Services;
 using Property.Tests.Unit.Support;
 using DomainUnit = Property.Domain.Entities.Unit;
@@ -91,11 +96,28 @@ public sealed class FeeChargeLiquidationTests
             fx.Repository<DomainUnit>(),
             fx.Repository<HorizontalProperty>(),
             fx.UnitOfWork,
-            new Property.Infrastructure.Messaging.OutboxWriter(
-                fx.Db,
-                fx.TenantContext,
-                Microsoft.Extensions.Options.Options.Create(
-                    new Property.Application.Common.Options.OutboxOptions())));
+            Outbox(fx),
+            Notices(fx));
+
+    private static OutboxWriter Outbox(TenantDbFixture fx) =>
+        new(
+            fx.Db,
+            fx.TenantContext,
+            Microsoft.Extensions.Options.Options.Create(
+                new Property.Application.Common.Options.OutboxOptions()));
+
+    private static AdminFeeNoticeService Notices(TenantDbFixture fx) =>
+        new(
+            fx.Db,
+            Outbox(fx),
+            new UnitBillingMailDirectory(fx.Db),
+            new StubQrRenderer(),
+            NullLogger<AdminFeeNoticeService>.Instance);
+
+    private sealed class StubQrRenderer : IQrCodePngRenderer
+    {
+        public byte[] Render(string payload) => [0x89, 0x50, 0x4E, 0x47];
+    }
 
     private static LiquidationCommitDto Dto(Seed seed) =>
         new()
@@ -124,6 +146,9 @@ public sealed class FeeChargeLiquidationTests
         var period = await fx.Db.BillingPeriods.SingleAsync(p => p.Id == seed.Period.Id);
         Assert.True(period.IsLiquidated);
         Assert.NotNull(period.LiquidatedAtUtc);
+        Assert.False(result.PaymentQrConfigured);
+        Assert.Equal(BreBQrPayload.MissingKey, result.PaymentQrSkipReason);
+        Assert.Equal(0, await fx.Db.OutboxMessages.CountAsync(m => m.MessageType == OutboxMessageTypes.AdminFeeNotice));
     }
 
     [Fact]

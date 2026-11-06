@@ -65,6 +65,10 @@ public static class DependencyInjection
         services.AddScoped<IUserPersonLinkService, UserPersonLinkService>();
         services.AddScoped<IPortalService, PortalService>();
         services.AddScoped<IFeeSettingsService, FeeSettingsService>();
+        services.AddScoped<IBreBPaymentProfileService, BreBPaymentProfileService>();
+        services.AddScoped<IUnitBillingMailDirectory, UnitBillingMailDirectory>();
+        services.AddScoped<IQrCodePngRenderer, QrCoderPngRenderer>();
+        services.AddScoped<IAdminFeeNoticeService, AdminFeeNoticeService>();
         services.AddScoped<IBillingPeriodService, BillingPeriodService>();
         services.AddScoped<IFeeChargeService, FeeChargeService>();
         services.AddScoped<IPaymentService, PaymentService>();
@@ -96,6 +100,7 @@ public static class DependencyInjection
         services.AddScoped<IOutboxMessageHandler, WhatsAppSendOutboxHandler>();
         services.AddScoped<IOutboxMessageHandler, WebhookDeliverOutboxHandler>();
         services.AddScoped<IOutboxMessageHandler, ChargePostedOutboxHandler>();
+        services.AddScoped<IOutboxMessageHandler, AdminFeeNoticeOutboxHandler>();
         services.AddScoped<IOutboxMessageHandler, PaymentPostedOutboxHandler>();
         services.AddScoped<IChartOfAccountsService, ChartOfAccountsService>();
         services.AddScoped<IJournalService, JournalService>();

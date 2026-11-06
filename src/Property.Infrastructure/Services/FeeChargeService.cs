@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Property.Application.Common.Interfaces;
 using Property.Application.Common.Models;
 using Property.Application.Features.Accounting;
+using Property.Application.Features.Billing.BreB;
 using Property.Application.Features.Billing.FeeCharges;
 using Property.Application.Messaging;
 using Property.Domain.Common;
@@ -21,6 +22,7 @@ public sealed class FeeChargeService : IFeeChargeService
     private readonly IRepository<HorizontalProperty> _properties;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IOutboxWriter _outbox;
+    private readonly IAdminFeeNoticeService _feeNotices;
 
     public FeeChargeService(
         ApplicationDbContext db,
@@ -29,7 +31,8 @@ public sealed class FeeChargeService : IFeeChargeService
         IRepository<Unit> units,
         IRepository<HorizontalProperty> properties,
         IUnitOfWork unitOfWork,
-        IOutboxWriter outbox)
+        IOutboxWriter outbox,
+        IAdminFeeNoticeService feeNotices)
     {
         _db = db;
         _charges = charges;
@@ -38,6 +41,7 @@ public sealed class FeeChargeService : IFeeChargeService
         _properties = properties;
         _unitOfWork = unitOfWork;
         _outbox = outbox;
+        _feeNotices = feeNotices;
     }
 
     public Task<PagedResult<FeeChargeDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
@@ -274,6 +278,7 @@ public sealed class FeeChargeService : IFeeChargeService
         period.LiquidatedAtUtc = DateTime.UtcNow;
         _periods.Update(period);
 
+        AdminFeeNoticePlan? notice = null;
         if (newCharges.Count > 0)
         {
             await _outbox.EnqueueAsync(
@@ -284,6 +289,17 @@ public sealed class FeeChargeService : IFeeChargeService
                     BillingPeriodId = period.Id,
                     FeeChargeIds = newCharges.Select(c => c.Id).ToList(),
                 },
+                cancellationToken);
+
+            notice = await _feeNotices.ScheduleAsync(
+                period.HorizontalPropertyId,
+                period.Id,
+                newCharges.Select(charge => new AdminFeeNoticeCharge
+                {
+                    FeeChargeId = charge.Id,
+                    UnitId = charge.UnitId,
+                    Amount = charge.Amount,
+                }).ToList(),
                 cancellationToken);
         }
 
@@ -299,6 +315,10 @@ public sealed class FeeChargeService : IFeeChargeService
                 TotalAmount = totalAmount,
                 IsLiquidated = true,
                 LiquidatedAtUtc = period.LiquidatedAtUtc,
+                PaymentQrConfigured = notice?.PaymentQrConfigured ?? false,
+                PaymentQrSkipReason = notice?.PaymentQrSkipReason,
+                PaymentNoticeEmailsQueued = notice?.PaymentNoticeEmailsQueued ?? 0,
+                PaymentNoticeUnitsWithoutEmail = notice?.PaymentNoticeUnitsWithoutEmail ?? 0,
             });
     }
 

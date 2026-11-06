@@ -31,7 +31,7 @@ public sealed class EmailSendOutboxHandler : IOutboxMessageHandler
         if (string.IsNullOrWhiteSpace(payload.ToEmail))
             throw new InvalidOperationException("email.send payload missing ToEmail.");
 
-        IReadOnlyList<EmailAttachment>? attachments = null;
+        var attachments = new List<EmailAttachment>();
         if (payload.AttachmentFileAssetId is Guid fileId)
         {
             var download = await _files.DownloadAsync(fileId, cancellationToken)
@@ -40,23 +40,43 @@ public sealed class EmailSendOutboxHandler : IOutboxMessageHandler
             {
                 await using var ms = new MemoryStream();
                 await download.Content.CopyToAsync(ms, cancellationToken);
-                attachments =
-                [
-                    new EmailAttachment
-                    {
-                        FileName = download.Asset.FileName,
-                        ContentType = download.Asset.ContentType,
-                        Content = ms.ToArray(),
-                    },
-                ];
+                attachments.Add(new EmailAttachment
+                {
+                    FileName = download.Asset.FileName,
+                    ContentType = download.Asset.ContentType,
+                    Content = ms.ToArray(),
+                });
             }
+        }
+
+        if (!string.IsNullOrWhiteSpace(payload.InlineContentBase64))
+        {
+            byte[] inline;
+            try
+            {
+                inline = Convert.FromBase64String(payload.InlineContentBase64);
+            }
+            catch (FormatException ex)
+            {
+                throw new InvalidOperationException("email.send inline image is not valid base64.", ex);
+            }
+
+            attachments.Add(new EmailAttachment
+            {
+                FileName = string.IsNullOrWhiteSpace(payload.InlineFileName) ? "qr.png" : payload.InlineFileName,
+                ContentType = string.IsNullOrWhiteSpace(payload.InlineContentType)
+                    ? "image/png"
+                    : payload.InlineContentType,
+                Content = inline,
+                ContentId = payload.InlineContentId,
+            });
         }
 
         await _emailSender.SendAsync(
             payload.ToEmail,
             payload.Subject ?? string.Empty,
             payload.HtmlBody ?? string.Empty,
-            attachments,
+            attachments.Count == 0 ? null : attachments,
             cancellationToken);
     }
 }
