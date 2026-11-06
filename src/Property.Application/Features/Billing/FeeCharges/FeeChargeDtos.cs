@@ -114,6 +114,10 @@ public sealed class LiquidationResultDto
     public decimal TotalAmount { get; set; }
     public bool IsLiquidated { get; set; }
     public DateTime? LiquidatedAtUtc { get; set; }
+    public bool PaymentQrConfigured { get; set; }
+    public string? PaymentQrSkipReason { get; set; }
+    public int PaymentNoticeEmailsQueued { get; set; }
+    public int PaymentNoticeUnitsWithoutEmail { get; set; }
 }
 
 public sealed class ArrearsSummaryDto

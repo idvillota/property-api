@@ -35,6 +35,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<UserPersonLink> UserPersonLinks => Set<UserPersonLink>();
     public DbSet<UnitOccupancy> UnitOccupancies => Set<UnitOccupancy>();
     public DbSet<FeeSettings> FeeSettings => Set<FeeSettings>();
+    public DbSet<BreBPaymentProfile> BreBPaymentProfiles => Set<BreBPaymentProfile>();
+    public DbSet<AdminFeeNoticeDelivery> AdminFeeNoticeDeliveries => Set<AdminFeeNoticeDelivery>();
     public DbSet<BillingPeriod> BillingPeriods => Set<BillingPeriod>();
     public DbSet<FeeCharge> FeeCharges => Set<FeeCharge>();
     public DbSet<Payment> Payments => Set<Payment>();
@@ -206,7 +208,9 @@ public sealed class ApplicationDbContext : DbContext
                 .WithMany(x => x.Buildings)
                 .HasForeignKey(x => x.HorizontalPropertyId)
                 .OnDelete(DeleteBehavior.Restrict);
-            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Name }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Name })
+                .IsUnique()
+                .HasFilter(StructureUniqueConflict.ActiveOnly);
         });
 
         modelBuilder.Entity<Floor>(e =>
@@ -216,7 +220,9 @@ public sealed class ApplicationDbContext : DbContext
                 .WithMany(x => x.Floors)
                 .HasForeignKey(x => x.BuildingId)
                 .OnDelete(DeleteBehavior.Restrict);
-            e.HasIndex(x => new { x.TenantId, x.BuildingId, x.Name }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.BuildingId, x.Name })
+                .IsUnique()
+                .HasFilter(StructureUniqueConflict.ActiveOnly);
         });
 
         modelBuilder.Entity<Unit>(e =>
@@ -242,7 +248,9 @@ public sealed class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.LinkedUnitId)
                 .OnDelete(DeleteBehavior.Restrict);
-            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Code }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.HorizontalPropertyId, x.Code })
+                .IsUnique()
+                .HasFilter(StructureUniqueConflict.ActiveOnly);
         });
 
         modelBuilder.Entity<VehicleBrand>(e =>
@@ -322,6 +330,29 @@ public sealed class ApplicationDbContext : DbContext
                 .WithOne()
                 .HasForeignKey<FeeSettings>(x => x.HorizontalPropertyId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<BreBPaymentProfile>(e =>
+        {
+            e.HasKey(x => x.HorizontalPropertyId);
+            e.Property(x => x.Key).HasMaxLength(40);
+            e.Property(x => x.MerchantName).HasMaxLength(80);
+            e.Property(x => x.City).HasMaxLength(40);
+            e.Property(x => x.PostalCode).HasMaxLength(10);
+            e.HasOne(x => x.HorizontalProperty)
+                .WithMany()
+                .HasForeignKey(x => x.HorizontalPropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AdminFeeNoticeDelivery>(e =>
+        {
+            e.Property(x => x.ToEmail).HasMaxLength(320);
+            e.HasOne(x => x.FeeCharge)
+                .WithMany()
+                .HasForeignKey(x => x.FeeChargeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.FeeChargeId, x.ToEmail }).IsUnique();
         });
 
         modelBuilder.Entity<BillingPeriod>(e =>
@@ -978,6 +1009,12 @@ public sealed class ApplicationDbContext : DbContext
         modelBuilder.Entity<FeeSettings>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
+        modelBuilder.Entity<BreBPaymentProfile>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<AdminFeeNoticeDelivery>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
         modelBuilder.Entity<BillingPeriod>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
@@ -1104,7 +1141,7 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
     }
 
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         foreach (var entry in ChangeTracker.Entries<AuditEvent>())
         {
@@ -1134,6 +1171,13 @@ public sealed class ApplicationDbContext : DbContext
             }
         }
 
-        return base.SaveChangesAsync(cancellationToken);
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (StructureUniqueConflict.TryTranslate(ex, out var conflict))
+        {
+            throw conflict;
+        }
     }
 }

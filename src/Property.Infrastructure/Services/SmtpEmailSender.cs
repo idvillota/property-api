@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Mail;
+using System.Net.Mime;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Property.Application.Common.Interfaces;
@@ -50,10 +51,18 @@ public sealed class SmtpEmailSender : IEmailSender
 
         if (attachments is not null)
         {
-            foreach (var attachment in attachments)
+            foreach (var file in attachments)
             {
-                var stream = new MemoryStream(attachment.Content);
-                message.Attachments.Add(new Attachment(stream, attachment.FileName, attachment.ContentType));
+                var stream = new MemoryStream(file.Content);
+                var mailAttachment = new Attachment(stream, file.FileName, file.ContentType);
+                if (!string.IsNullOrWhiteSpace(file.ContentId))
+                {
+                    mailAttachment.ContentId = file.ContentId;
+                    mailAttachment.ContentDisposition!.Inline = true;
+                    mailAttachment.ContentDisposition.DispositionType = DispositionTypeNames.Inline;
+                }
+
+                message.Attachments.Add(mailAttachment);
             }
         }
 
